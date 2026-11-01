@@ -13,6 +13,7 @@
 \usepackage{xcolor}
 \usepackage{amsmath}
 \usepackage{microtype}
+\usepackage[most]{tcolorbox}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{hyperref}
 
@@ -39,28 +40,73 @@
 
 % =========================================================================
 % PAGE DE GARDE
+% (préambule : \usepackage{graphicx} et \usepackage[most]{tcolorbox})
 % =========================================================================
+\newgeometry{top=1.4cm,bottom=1.6cm,left=2cm,right=2cm}
 \begin{titlepage}
 \centering
-\vspace*{1cm}
-{\large \aremplir{Nom de l'établissement}\par}
-\vspace{0.3cm}
-{\large Licence Professionnelle en Génie Informatique\par}
-\vspace{2cm}
-{\Large Rapport de projet de fin d'études\par}
-\vspace{1.2cm}
-{\Huge\bfseries AKORI\par}
-\vspace{0.5cm}
-{\Large Assistant Knowledge Organized to Revise Intelligently\par}
-\vspace{0.6cm}
-{\large Assistant de révision fondé sur une architecture RAG,\\ ancré dans les supports de cours de l'étudiant\par}
+
+% --- En-tête : logo université | tutelle | logo ISSTM
+\begin{minipage}[c]{0.17\textwidth}\centering
+  \includegraphics[height=2.3cm,width=\linewidth,keepaspectratio]{UNIVERSITE.jpg}
+\end{minipage}%
+\begin{minipage}[c]{0.66\textwidth}\centering
+  {\small\bfseries MINISTÈRE DE L'ENSEIGNEMENT SUPÉRIEUR\\
+   ET DE LA RECHERCHE SCIENTIFIQUE\par}
+  \vspace{4pt}
+  {\large\bfseries UNIVERSITÉ DE MAHAJANGA\par}
+  \vspace{4pt}
+  {\small Institut Supérieur des Sciences et Technologies de Mahajanga\par}
+\end{minipage}%
+\begin{minipage}[c]{0.17\textwidth}\centering
+  \includegraphics[height=2.3cm,width=\linewidth,keepaspectratio]{ISSTM.jpg}
+\end{minipage}
+
+\vspace{6pt}
+\rule{\textwidth}{0.8pt}
+
 \vfill
-{\large Présenté par : \aremplir{Prénom NOM}\par}
-\vspace{0.3cm}
-{\large Sous la direction de : \aremplir{Titre, Prénom NOM de l'encadrant}\par}
-\vspace{1cm}
-{\large Année universitaire \aremplir{2025--2026}\par}
+{\large\bfseries Parcours : \mdseries Génie Informatique\par}
+
+\vfill
+{\LARGE\bfseries PROJET DE FIN D'ÉTUDES\par}
+\vspace{4pt}
+{\normalsize en vue de l'obtention du diplôme de Licence professionnelle\par}
+
+% --- Titre encadré
+\vfill
+\begin{tcolorbox}[enhanced, width=0.92\textwidth, arc=4mm, boxrule=1.2pt,
+                  colframe=blue!55!black, colback=white, halign=center,
+                  top=5mm, bottom=5mm]
+  {\fontsize{34}{40}\selectfont\bfseries AKORI\par}
+  \vspace{3mm}
+  {\Large Assistant Knowledge Organized to Revise Intelligently\par}
+  \vspace{4mm}
+  {\normalsize\itshape Conception et développement d'un assistant intelligent\\
+   de révision basé sur l'architecture RAG\par}
+\end{tcolorbox}
+
+% --- Auteure et soutenance
+\vfill
+{\large Présenté par : \textbf{Nomeniavo Edm-Johana RAFALIMANANA}\par}
+\vspace{0.35cm}
+{\normalsize Soutenu publiquement le : [Date de soutenance]\par}
+
+% --- Jury (pas de ligne vide dans le tableau : elle décale les colonnes)
+\vfill
+{\large\bfseries Membres du jury\par}
+\vspace{0.35cm}
+{\large
+\begin{tabular}{@{}l@{\quad:\quad}l@{\qquad}l@{}}
+  Président  & Monsieur [Nom et Prénoms]        & [Grade] \\[5pt]
+  Rapporteur & Monsieur/Madame [Nom et Prénoms] & [Grade] \\[5pt]
+  Encadreur  & Monsieur TSANGANDRAZANA Judicael & [Grade] \\
+\end{tabular}\par}
+
+\vfill
+{\large Semestre 5 \quad\textbullet\quad Année universitaire : 2025--2026\par}
 \end{titlepage}
+\restoregeometry
 
 \pagenumbering{roman}
 
