@@ -5771,6 +5771,83 @@ html:root:root:root:root body .akori-dark-page input:-internal-autofill-selected
 .akori-dark-page input[type="checkbox"] { appearance:auto;width:18px!important;height:18px!important;accent-color:#8b6cff;background:#141418!important;border:1px solid #3a3a44!important;border-radius:5px; }
 .akori-dark-page input[type="checkbox"]:checked { background-color:#8b6cff!important; }
 footer, .gradio-container footer { display:none!important; }
+
+/* =====================================================================================
+   STABILITÉ AU ZOOM ET AU REDIMENSIONNEMENT
+   - box-sizing partout, médias bornés à leur conteneur, enfants flexibles autorisés à rétrécir ;
+   - tailles de mise en page en rem / % / vh avec clamp() ;
+   - points de rupture posés par le script sur <body> (ak-narrow, ak-short, m-mode) : plus fiables
+     que les @media, que Gradio réécrit en préfixant les sélecteurs.
+   ===================================================================================== */
+*, *::before, *::after { box-sizing:border-box; }
+#app-view img, #app-view svg, #app-view video, #app-view iframe, #app-view canvas { max-width:100%; }
+#app-view .row, #app-view .column, #app-view .block, #app-view .form { min-width:0!important; }
+#app-view .prose, #app-view .html-container, .folder-card, .mini-stat, .plan-task, .hx-item, .ak-pane { overflow-wrap:anywhere; }
+:root { --sb-open:clamp(13.5rem, 19vw, 16.5rem); --sb-rail:4.5rem; }
+
+/* --- en-tête : l'onglet de la page « posé » sur la carte du corps --- */
+html:root:root:root:root body.in-app #main-column { gap:0!important; }
+html:root:root:root:root body.in-app #topbar { background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0 0 -1px 0!important;
+  min-height:0!important;align-items:flex-end!important;flex-wrap:wrap!important;gap:.5rem .75rem!important;position:relative;z-index:3;overflow:visible!important; }
+html:root:root:root:root body.in-app #topbar > #topbar-title { flex:0 1 auto!important;max-width:100%!important;min-width:0!important;position:relative;
+  background:var(--ak-card)!important;border:1px solid var(--ak-line)!important;border-bottom-color:var(--ak-card)!important;
+  border-radius:1rem 1rem 0 0!important;padding:.6rem 1.2rem .7rem 1rem!important;box-shadow:0 -0.5rem 1.25rem rgba(0,0,0,.08); }
+html:root:root:root:root body.in-app #topbar > #topbar-title::after { content:"";position:absolute;right:-1rem;bottom:-1px;width:1rem;height:1rem;pointer-events:none;
+  background:radial-gradient(circle at 100% 0, transparent calc(1rem - .5px), var(--ak-line) calc(1rem - .5px), var(--ak-line) 1rem, var(--ak-card) calc(1rem + .5px)); }
+html:root:root:root:root body.in-app #topbar > #topbar-title.tab-anim { animation:aktabin .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes aktabin { from { opacity:.35;transform:translateY(.5rem); } to { opacity:1;transform:none; } }
+html:root:root:root:root body.in-app #topbar > #topbar-title { width:auto!important; }
+html:root:root:root:root body.in-app #topbar > .form:has(#doc-select), html:root:root:root:root body.in-app #topbar > #doc-select { flex:0 1 clamp(12rem, 28vw, 21rem)!important;width:auto!important;margin:0 0 .45rem auto!important;min-width:0!important;
+  background:transparent!important;border:0!important;box-shadow:none!important; }
+html:root:root:root:root body.in-app #topbar .form:has(#doc-select) > #doc-select { flex:1 1 auto!important;width:100%!important;min-width:0!important; }
+html:root:root:root:root body.in-app #main-tabs { border-top-left-radius:0!important;position:relative;z-index:2; }
+#ak-page-title { font-size:clamp(1rem, .9rem + .45vw, 1.2rem); }
+.pt-sub { font-size:clamp(.66rem, .62rem + .15vw, .74rem); }
+.pt-ico { height:clamp(1.6rem, 4vh, 2.1rem); }
+
+/* --- grilles fluides : le nombre de colonnes suit la place disponible --- */
+html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(auto-fill, minmax(min(100%, 8.75rem), 1fr))!important; }
+html:root:root:root:root body .stat-row { grid-template-columns:repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr))!important; }
+html:root:root:root:root body .folder-grid { grid-template-columns:repeat(auto-fill, minmax(min(100%, 12rem), 1fr))!important; }
+html:root:root:root:root body .mod-grid, html:root:root:root:root body .ld-three, html:root:root:root:root body .plan-kpis, html:root:root:root:root body .jr-kpis { grid-template-columns:repeat(auto-fit, minmax(min(100%, 11rem), 1fr))!important; }
+.hero-compact h1 { font-size:clamp(1.25rem, 1rem + 1.2vw, 1.9rem)!important; }
+.hero-compact .hero-visual { flex:0 1 clamp(8rem, 18vw, 15rem)!important; }
+html:root:root:root:root body .ak-toolbar, html:root:root:root:root body #scope-row, html:root:root:root:root body #chat-scope .wrap, html:root:root:root:root body .hero-chips, html:root:root:root:root body .act-bar-row { flex-wrap:wrap!important; }
+html:root:root:root:root body #assistant-bar { flex-wrap:nowrap!important;max-width:100%; }
+html:root:root:root:root body #assistant-bar #assistant-input { min-width:0!important;flex:1 1 auto!important; }
+
+/* --- écran étroit (zoom avant, petite fenêtre) : les deux colonnes passent l'une sous l'autre --- */
+html:root:root:root:root body.ak-narrow .ak-cols { flex-direction:column!important;flex-wrap:nowrap!important; }
+html:root:root:root:root body.ak-narrow .ak-cols > .ak-pane { width:100%!important;min-width:0!important;flex:1 1 auto!important; }
+html:root:root:root:root body.ak-narrow .hero-compact .hero-visual { display:none!important; }
+html:root:root:root:root body.ak-narrow #documents-row { flex-wrap:wrap!important; } html:root:root:root:root body.ak-narrow #documents-row > * { flex:1 1 100%!important; }
+
+/* --- fenêtre basse (fort zoom) : on abandonne « tout dans l'écran » et la page défile normalement --- */
+html:root:has(body.in-app.ak-short) { overflow-y:auto!important; }
+html:root:root:root:root body.in-app.ak-short { overflow:visible!important; }
+html:root:root:root:root body.in-app.ak-short #main-column { height:auto!important;overflow:visible!important; }
+html:root:root:root:root body.in-app.ak-short #main-tabs { flex:none!important;overflow:visible!important; }
+html:root:root:root:root body.in-app.ak-short #main-tabs > .tabitem { overflow:visible!important; }
+html:root:root:root:root body.in-app.ak-short #assistant-chatbot { height:max(18rem, 70vh)!important; }
+html:root:root:root:root body.in-app.ak-short #summary-out { height:auto!important;max-height:none!important; }
+html:root:root:root:root body.in-app.ak-short .mm-wrap { max-height:none!important; }
+html:root:root:root:root body.in-app.ak-short #main-tabs iframe { height:min(28rem, 85vh)!important; }
+/* barre latérale compacte quand la hauteur manque */
+html:root:root:root:root body.ak-short #sidebar .brand-sub, html:root:root:root:root body.ak-short #sidebar .nav-title { display:none!important; }
+html:root:root:root:root body.ak-short #sidebar .navbtn { min-height:clamp(1.55rem, 5.2vh, 2.2rem)!important; }
+html:root:root:root:root body.ak-short #sidebar .brand { margin-bottom:.35rem!important; }
+html:root:root:root:root body #sidebar { overflow-y:auto!important;overscroll-behavior:contain; }
+html:root:root:root:root body.ak-sbtight #sidebar .brand-sub, html:root:root:root:root body.ak-sbtight #sidebar .nav-title { display:none!important; }
+html:root:root:root:root body.ak-sbtight #sidebar .brand { margin:0 0 .3rem!important; }
+html:root:root:root:root body.ak-sbtight #sidebar #sidebar-toggle { height:2rem!important;margin-bottom:.15rem!important; }
+html:root:root:root:root body.ak-sbtight #sidebar .navbtn { min-height:clamp(1.15rem, calc((100vh - 17rem) / 17), 2.4rem)!important;height:auto!important; }
+html:root:root:root:root body.ak-sbtight #sidebar { padding-top:.6rem!important;padding-bottom:.4rem!important; }
+
+/* --- téléphone : le sélecteur de cours passe au-dessus de l'onglet --- */
+html:root:root:root:root body.ak-narrow.in-app #topbar > .form:has(#doc-select), html:root:root:root:root body.ak-narrow.in-app #topbar > #doc-select { order:-1;flex:1 1 100%!important;margin:0 0 .5rem 0!important; }
+html:root:root:root:root body.m-mode.in-app #topbar > .form:has(#doc-select), html:root:root:root:root body.m-mode.in-app #topbar > #doc-select { order:-1;flex:1 1 100%!important;margin:0 0 .5rem 0!important; }
+html:root:root:root:root body.m-mode.in-app #topbar > #topbar-title { flex:1 1 auto!important; }
+html:root:root:root:root body.m-mode.in-app #topbar > #topbar-title::after { display:none; }
 """
 
 
@@ -6311,7 +6388,17 @@ AKORI_NAV_JS = r"""
     if (mt) document.body.style.setProperty('--body-h', mt.clientHeight + 'px');
     const active = document.querySelector('#sidebar .navbtn.nav-active');
     const title = document.getElementById('ak-page-title');
-    if (active && title) { const t = (active.textContent || '').trim(); if (t && title.textContent !== t) title.textContent = t; }
+    if (active && title) {
+      const t = (active.textContent || '').trim();
+      if (t && title.textContent !== t) {
+        title.textContent = t;
+        const tab = document.getElementById('topbar-title');
+        if (tab) { tab.classList.remove('tab-anim'); void tab.offsetWidth; tab.classList.add('tab-anim'); }
+      }
+    }
+    document.body.classList.toggle('ak-narrow', (mt ? mt.clientWidth : window.innerWidth) < 760);
+    document.body.classList.toggle('ak-short', window.innerHeight < 600);
+    document.body.classList.toggle('ak-sbtight', window.innerHeight < 760);
     const lw = document.getElementById('login-wrap');
     document.body.classList.toggle('on-login', !!(lw && lw.offsetParent !== null));
   };
