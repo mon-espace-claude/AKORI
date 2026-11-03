@@ -374,7 +374,7 @@ def _extract_document_title(full_text):
         if len(line) <= 180 and not re.match(r"^(project vision|main objective|phase \d|week \d)", lower):
             return line
 
-    return lines[0] if lines else ""
+    return (lines[0][:117] + "…") if lines and len(lines[0]) > 120 else (lines[0] if lines else "")
 
 
 # --- 2. STOCKAGE PERSISTANT, COMPTES ET DONNÉES PAR UTILISATEUR ---
@@ -2249,7 +2249,7 @@ def dashboard_html(active_doc=None):
     pct = stats["percent"] if stats else 0
     # (onglet, icône, titre, description, étapes, astuce, bouton)
     cards_guide = [
-        ("courses", "📁", "Mes dossiers et modules", "Importez vos PDF (même scannés) et rangez-les par module et par semestre.",
+        ("courses", "📁", "Dossiers & modules", "Importez vos PDF (même scannés) et rangez-les par module et par semestre.",
          ["Ajoutez un ou plusieurs PDF : AKORI lit le texte, lance l'OCR si la page est une image, puis indexe chaque page.",
           "Créez un module par matière (ex. Réseaux, Algorithmique) et choisissez son semestre.",
           "Rangez directement vos nouveaux fichiers dans un module au moment de l'import."],
@@ -2324,38 +2324,27 @@ def dashboard_html(active_doc=None):
 
     slogan = "Réviser, c'est reprendre, comprendre, mémoriser et maîtriser : chaque notion, avec les mots et les exemples de votre cours."
     return f"""
-    <div class='hero'>
+    <div class='home-fit'>
+    <div class='hero hero-compact'>
       <div class='hero-glow'></div>
       <div class='hero-text'>
         <div class='eyebrow'>ASSISTANT KNOWLEDGE ORGANIZED TO REVISE INTELLIGENTLY</div>
         <h1>{greeting}<br><span class='hero-grad'>Prêt à booster votre révision ?</span></h1>
-        <p class='home-slogan'>AKORI transforme vos cours PDF en un espace de révision intelligent : résumé, flashcards roulette, quiz, colle orale, plan de révision et assistant RAG.</p>
-        <div class='hero-chips'><span>Résumé</span><span>Flashcards</span><span>Quiz</span><span>Colle orale</span><span>Plan</span><span>Assistant IA</span></div>
+        <p class='home-slogan'>Cours actif : <b>{_escape_html(active_title if len(active_title) <= 70 else active_title[:67] + '…')}</b></p>
       </div>
       <div class='hero-visual'>{art}</div>
     </div>
     <div class='stat-row'>
-      <div class='mini-stat'><b class='cu'>{total_docs}</b><span>Cours importés</span><small>dans votre espace</small></div>
-      <div class='mini-stat'><b class='cu'>{active_chunks}</b><span>Passages indexés</span><small>dans le cours actif ({total_chunks} au total)</small></div>
-      <div class='mini-stat'><b class='cu'>{questions_here}</b><span>Questions posées</span><small>à l'assistant sur ce cours ({questions_all} sur tous vos cours)</small></div>
-      <div class='mini-stat'><b class='cu'>{pct}%</b><span>Progression du cours actif</span><small>flashcards, quiz et colle orale</small></div>
+      <div class='mini-stat'><b class='cu'>{total_docs}</b><span>Cours importés</span></div>
+      <div class='mini-stat'><b class='cu'>{active_chunks}</b><span>Passages indexés (cours actif)</span></div>
+      <div class='mini-stat'><b class='cu'>{questions_here}</b><span>Questions posées (cours actif)</span></div>
+      <div class='mini-stat'><b class='cu'>{pct}%</b><span>Progression du cours actif</span></div>
     </div>
     <div class='guide-box'>
-      <h3>💡 Guide de révision : cliquez sur une fonction pour la découvrir en détail</h3>
+      <h3>Que voulez-vous faire ? <small>Touchez une fonction pour voir comment elle marche.</small></h3>
       <div class='guide-grid'>{guide}</div>
     </div>
-    <div class='section-head'><div><h2>Réviser un cours en un clic</h2><p>Générez les outils principaux à partir du cours actif.</p></div></div>
-    <div class='revision-banner'>
-      <div><strong>{_escape_html(active_title)}</strong><br><span>Résumé · Flashcards · Quiz / QCM · Colle orale · Assistant IA</span></div>
-      <span class='revision-chip'>Cours actif</span>
-    </div>
-    <div class='section-head'><div><h2>Mes cours</h2><p>Vos supports de révision indexés localement.</p></div></div>
-    <div class='folder-grid'>{cards}</div>
-    <div class='home-footer'>
-      <img class='hf-logo' src='{LOGO_DATA_URI}' alt='AKORI'>
-      <div class='hf-name'>AKORI</div>
-      <p class='hf-slogan'>{slogan}</p>
-      <div class='hf-sub'>Assistant Knowledge Organized to Revise Intelligently</div>
+    <div class='home-foot'><img src='{LOGO_DATA_URI}' alt='AKORI'><span>{slogan}</span></div>
     </div>
     """
 
@@ -3269,14 +3258,17 @@ def oral_history_html(doc_name):
             f"<span>{len(attempts)} séance(s) · moyenne {avg:.1f}/10</span></div><ul>{rows}</ul></div>")
 
 
+ORAL_EMPTY = "<div class='empty-study'>🎤<br><b>La correction s'affichera ici.</b><br>Note sur 10, points manquants et page à relire.</div>"
+
+
 def oral_reset(doc_name):
-    return {}, oral_card_html(None), "", "", "", oral_history_html(doc_name)
+    return {}, oral_card_html(None), "", ORAL_EMPTY, "", oral_history_html(doc_name)
 
 
 def oral_new_handler(doc_name, lang, last_state):
     """Nouvelle question : tirée de la banque préparée (instantané) ou générée par Gemini."""
     if not doc_name or doc_name not in documents_db:
-        yield {}, oral_card_html(None), gr.update(), "", "⚠️ Sélectionnez d'abord un cours."
+        yield {}, oral_card_html(None), gr.update(), ORAL_EMPTY, "⚠️ Sélectionnez d'abord un cours."
         return
     doc = documents_db[doc_name]
     bank = doc.setdefault("oral_bank", [])
@@ -3284,7 +3276,7 @@ def oral_new_handler(doc_name, lang, last_state):
     fresh = [b for b in bank if b.get("question") != last_q]
     if len(bank) >= 3 and fresh:
         state = random.choice(fresh)
-        yield state, oral_card_html(state), "", "", "Répondez à l'écrit ou à la voix, puis cliquez sur « Corriger ma réponse »."
+        yield state, oral_card_html(state), "", ORAL_EMPTY, "Répondez à l'écrit ou à la voix, puis cliquez sur « Corriger »."
         return
     passage = _oral_prepare(doc)
     if not passage:
@@ -3297,7 +3289,7 @@ def oral_new_handler(doc_name, lang, last_state):
     except Exception as e:
         if fresh:                      # IA indisponible : on pioche dans la banque
             state = random.choice(fresh)
-            yield state, oral_card_html(state), "", "", "Répondez à l'écrit ou à la voix, puis cliquez sur « Corriger ma réponse »."
+            yield state, oral_card_html(state), "", ORAL_EMPTY, "Répondez à l'écrit ou à la voix, puis cliquez sur « Corriger »."
         else:
             yield gr.update(), gr.update(), gr.update(), gr.update(), f"⚠️ {e}"
         return
@@ -3772,7 +3764,7 @@ def quiz_validate_handler(questions, index, choice, validated, answers, doc_name
     answers.extend([None] * (len(questions) - len(answers)))
     answers[idx] = int(choice)
     ok = int(choice) == int(questions[idx]["answer"])
-    status = "✅ Bonne réponse." if ok else "❌ Réponse incorrecte. Consultez l'explication."
+    status = ""   # le verdict est déjà affiché dans la carte
     last = idx == len(questions) - 1
     _remember_quiz(doc_name, questions, idx, answers, True)
     return (True, quiz_view(questions, idx, True, answers), status, answers,
@@ -5238,6 +5230,164 @@ html:root:root:root:root body.m-mode .ld-nav { backdrop-filter:none;background:r
 html:root:root:root:root body.m-mode .hero-glow, html:root:root:root:root body.m-mode .art-blob { animation:none; }
 html:root:root:root:root body.m-mode .ld-marquee { animation-duration:55s; }
 
+
+/* ===== Écran unique : en-tête (page + cours actif) séparé du corps (page active), sans défilement de la page ===== */
+html:root:has(body.in-app) { overflow:hidden!important; }
+html:root:root:root:root body.in-app { overflow:hidden!important; }
+html:root:root:root:root body.in-app #main-column { height:calc(100dvh - var(--mc-top, 14px) - 12px)!important;display:flex!important;flex-direction:column!important;
+  flex-wrap:nowrap!important;gap:10px!important;min-height:0!important;overflow:hidden!important; }
+html:root:root:root:root body.in-app #topbar { flex:none!important;margin:0!important;padding:8px 10px 8px 16px!important;min-height:62px;flex-wrap:nowrap!important;
+  align-items:center!important;gap:12px!important;border-radius:16px!important; }
+html:root:root:root:root body.in-app #topbar > #topbar-title { flex:1 1 auto!important;min-width:0!important; }
+html:root:root:root:root body.in-app #topbar > #doc-select { flex:0 0 min(340px,46%)!important;min-width:0!important; }
+.pt-wrap { display:flex;align-items:center;gap:12px;min-width:0; }
+.pt-ico { flex:none;width:6px;height:34px;border-radius:6px;background:linear-gradient(180deg,#4f6df5,#8e6cf4); }
+#ak-page-title { font-size:19px;font-weight:800;color:var(--ak-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.pt-sub { font-size:11.5px;color:var(--ak-muted);white-space:nowrap; }
+html:root:root:root:root body.in-app #main-tabs { flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important;
+  background:var(--ak-card)!important;border:1px solid var(--ak-line)!important;border-radius:18px!important;overflow:hidden!important;margin:0!important; }
+html:root:root:root:root body.in-app #main-tabs > .tabitem { flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;
+  padding:14px 16px!important;scrollbar-width:thin; }
+html:root:root:root:root body.in-app #main-tabs .tabitem { min-height:0!important; }
+html:root:root:root:root body.in-app #main-tabs .tabitem > .column, html:root:root:root:root body.in-app #main-tabs .tabitem > div > .column { gap:10px!important; }
+/* colonnes et volets */
+.ak-cols { gap:14px!important;align-items:stretch!important; }
+html:root:root:root:root body.in-app .ak-pane { background:var(--ak-bg)!important;border:1px solid var(--ak-line)!important;border-radius:16px!important;padding:12px 14px!important;gap:10px!important;min-width:0!important; }
+.pane-title { font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ak-blue); }
+.ak-toolbar { gap:10px!important;align-items:center!important;flex-wrap:wrap!important; }
+.ak-toolbar > * { flex:0 1 auto!important;min-width:0!important; }
+.tb-hint { color:var(--ak-muted);font-size:13px; }
+#summary-out { height:calc(var(--body-h, 600px) - 96px);overflow-y:auto;padding:14px 18px!important;border:1px solid var(--ak-line);border-radius:16px;background:var(--ak-bg); }
+html:root:root:root:root body.in-app #assistant-chatbot { height:calc(var(--body-h, 600px) - 100px)!important;min-height:260px!important; }
+html:root:root:root:root body.in-app #assistant-chatbot > .wrapper, html:root:root:root:root body.in-app #assistant-chatbot .bubble-wrap { height:100%!important;max-height:none!important; }
+#assistant-bar { gap:10px!important;align-items:center!important;flex-wrap:nowrap!important; }
+#assistant-bar #chat-scope { flex:none!important; }
+#chat-scope .wrap { gap:4px!important; }
+#chat-scope label { padding:6px 10px!important;font-size:12.5px!important; }
+.mm-wrap { max-height:calc(var(--body-h, 600px) - 90px);display:flex;flex-direction:column; } .mm-scroll { overflow:auto;flex:1;min-height:0; }
+/* accueil tenant dans l'écran */
+.home-fit { display:flex;flex-direction:column;gap:12px; }
+html:root:root:root:root body .hero.hero-compact { min-height:0!important;padding:16px 22px!important;margin:0!important; }
+.hero-compact h1 { font-size:clamp(22px,2.4vw,30px)!important;margin:6px 0 4px!important; }
+.hero-compact .home-slogan { margin:4px 0 0!important;font-size:13.5px; }
+.hero-compact .hero-visual { flex:0 1 240px!important; } .hero-compact .hero-art { max-width:240px;max-height:150px; }
+.home-fit .stat-row { margin:0!important; }
+.home-fit .mini-stat { padding:10px 14px!important; } .home-fit .mini-stat b { font-size:20px; }
+.home-fit .guide-box { margin:0!important;padding:14px 16px!important; }
+.home-fit .guide-box h3 { margin:0 0 10px!important;font-size:15px!important; } .home-fit .guide-box h3 small { font-weight:500;color:var(--ak-muted);font-size:12.5px;margin-left:8px; }
+html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px!important; }
+.home-fit details.guide-card > summary { padding:10px 12px;gap:10px;align-items:flex-start; }
+.home-fit .gc-ico { width:34px;height:34px;border-radius:11px; } .home-fit .gc-body b { font-size:13.5px; }
+.home-fit .gc-body > span { font-size:12px!important;line-height:1.35!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+.home-fit .gc-chev { display:none; }
+/* détail du guide : fenêtre au centre de l'écran (la page ne s'allonge pas) */
+details.guide-card[open] { grid-column:auto!important; }
+details.guide-card[open]::before { content:"";position:fixed;inset:0;background:rgba(8,10,20,.55);z-index:400;backdrop-filter:blur(2px); }
+details.guide-card[open] > .gc-detail { position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:401;width:min(560px,92vw);max-height:84vh;overflow:auto;
+  background:var(--ak-card);border:1px solid var(--ak-line);border-radius:20px;padding:22px 24px 20px!important;box-shadow:0 30px 80px rgba(0,0,0,.35);animation:akrise .25s ease both; }
+details.guide-card[open] > summary { position:relative;z-index:402;pointer-events:none; }
+.gc-close { position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid var(--ak-line);background:var(--ak-soft);color:var(--ak-text);cursor:pointer;font-size:16px;line-height:1; }
+.gc-detail-title { font-size:18px;font-weight:800;color:var(--ak-text);margin:0 30px 10px 0; }
+.home-foot { display:flex;align-items:center;justify-content:center;gap:10px;color:var(--ak-muted);font-size:12.5px;font-style:italic;text-align:center;padding:2px 0; }
+.home-foot img { width:22px;height:22px;border-radius:7px; }
+@media (max-width:1100px) { html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(3,minmax(0,1fr))!important; } }
+html:root:root:root:root body.m-mode .home-fit .guide-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+html:root:root:root:root body.m-mode .hero-compact .hero-visual { display:none!important; }
+html:root:root:root:root body.m-mode.in-app #topbar { flex-wrap:wrap!important; } html:root:root:root:root body.m-mode.in-app #topbar > #doc-select { flex:1 1 100%!important; }
+html:root:root:root:root body.m-mode .ak-pane { padding:10px!important; }
+
+/* ===== Connexion façon Claude (sombre et chaleureux) + comptes récents façon Messenger ===== */
+html:root:root:root:root body.on-login, html:root:root:root:root body.on-login .gradio-container { background:#1f1e1d!important; }
+#login-wrap { width:min(440px,100%)!important;margin:0 auto!important;gap:16px!important; }
+#auth-top { align-items:center!important;justify-content:space-between!important;flex-wrap:nowrap!important;background:transparent!important;border:0!important;margin-bottom:6px; }
+#auth-top > * { flex:0 0 auto!important;width:auto!important; }
+.auth-logo { display:flex;align-items:center;gap:10px; } .auth-logo img { width:34px;height:34px;border-radius:10px; }
+.auth-logo span { font-size:20px;font-weight:800;letter-spacing:.12em;color:#faf9f5!important; }
+.auth-hero { text-align:center;margin:18px 0 6px; }
+.auth-hero h1 { font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-weight:400;font-size:clamp(34px,6vw,46px);line-height:1.12;letter-spacing:-.01em;color:#faf9f5!important;margin:0 0 12px!important; }
+.auth-hero p { color:#a6a39b!important;font-size:15.5px;margin:0!important; }
+html:root:root:root:root body .auth-card { background:#262624!important;border:1px solid #3d3d3a!important;border-radius:24px!important;padding:22px!important;gap:12px!important;box-shadow:0 20px 60px rgba(0,0,0,.35)!important; }
+.auth-card-title { font-size:17px;font-weight:700;color:#faf9f5;text-align:center;margin-bottom:2px; }
+html:root:root:root:root body .auth-card input[type="text"], html:root:root:root:root body .auth-card input[type="password"], html:root:root:root:root body .auth-card textarea { background:#30302e!important;border:1px solid #4a4945!important;border-radius:12px!important;color:#faf9f5!important;-webkit-text-fill-color:#faf9f5!important;min-height:48px!important;font-size:15px!important; }
+html:root:root:root:root body .auth-card label > span, html:root:root:root:root body .auth-card [data-testid="block-info"] { color:#c2c0b6!important;font-size:13px!important;font-weight:600!important; }
+html:root:root:root:root body #li-btn, html:root:root:root:root body #su-btn { min-height:48px!important;border-radius:12px!important;background:#faf9f5!important;color:#1f1e1d!important;-webkit-text-fill-color:#1f1e1d!important;font-size:15px!important; }
+html:root:root:root:root body #li-btn:hover, html:root:root:root:root body #su-btn:hover { background:#e8e6dc!important; }
+.auth-or { display:flex;align-items:center;gap:12px;color:#8a877f;font-size:12px;letter-spacing:.08em;margin:2px 0; }
+.auth-or::before, .auth-or::after { content:"";flex:1;height:1px;background:#3d3d3a; }
+html:root:root:root:root body .auth-alt, html:root:root:root:root body .auth-alt.gr-button { min-height:46px!important;border-radius:12px!important;background:transparent!important;border:1px solid #4a4945!important;color:#faf9f5!important;-webkit-text-fill-color:#faf9f5!important;font-weight:600!important; }
+html:root:root:root:root body .auth-alt:hover { background:#30302e!important; }
+.auth-legal { text-align:center;color:#8a877f;font-size:12px;line-height:1.5;margin-top:4px; }
+#ak-accounts:empty { display:none; }
+.acc-title { font-size:13px;color:#c2c0b6;font-weight:600;margin-bottom:8px; }
+.acc-row { display:flex;gap:10px;overflow-x:auto;padding-bottom:4px; }
+.acc { position:relative;flex:0 0 96px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border-radius:16px;border:1px solid #3d3d3a;background:#30302e;cursor:pointer;transition:border-color .15s,transform .15s; }
+.acc:hover { border-color:#8a877f;transform:translateY(-2px); } .acc.on { border-color:#8ea2ff;box-shadow:0 0 0 3px rgba(142,162,255,.2); }
+.acc-av { width:54px;height:54px;border-radius:50%;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;background:linear-gradient(135deg,#4f6df5,#8e6cf4); }
+.acc-name { font-size:12.5px;color:#faf9f5;font-weight:600;max-width:86px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.acc-x { position:absolute;top:4px;right:6px;width:20px;height:20px;border-radius:50%;border:0;background:transparent;color:#8a877f;cursor:pointer;font-size:14px;line-height:1; }
+.acc-x:hover { color:#faf9f5;background:#3d3d3a; }
+.acc-add .acc-av { background:#3d3d3a;color:#c2c0b6;font-size:26px;font-weight:400; }
+.acc-pick { display:none;text-align:center;color:#faf9f5;font-size:15px;margin:2px 0; } .acc-pick b { font-weight:700; }
+.picked .acc-pick { display:block; } .picked #li-user { display:none!important; }
+.ub-mail { display:none!important; }
+
+
+/* ajustements : accueil sur une seule hauteur d'écran, quiz compact, connexion compacte */
+html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(6,minmax(0,1fr))!important; }
+@media (max-width:1250px) { html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(4,minmax(0,1fr))!important; } }
+.hero-compact .hero-art { max-height:118px!important; }
+.home-fit .hero-compact .eyebrow { font-size:9.5px; }
+html:root:root:root:root body details.guide-card[open], html:root:root:root:root body details.guide-card[open]:hover { overflow:visible!important;transform:none!important;animation:none!important; }
+html:root:root:root:root body .quiz-card { padding:16px 20px!important; }
+html:root:root:root:root body .quiz-card h2 { margin:8px 0 10px!important;font-size:18px!important; }
+html:root:root:root:root body .quiz-card .option { padding:9px 12px!important;margin:6px 0!important; }
+html:root:root:root:root body .quiz-card .quiz-explanation { margin-top:10px!important;padding:10px 12px!important; }
+html:root:root:root:root body .quiz-card .quiz-swipe { margin-top:10px!important;padding:8px 12px!important; }
+html:root:root:root:root body .quiz-card .quiz-verdict { margin-bottom:6px!important; }
+html:root:root:root:root body.on-login.on-login, html:root:root:root:root body.on-login.on-login .gradio-container { background:#1f1e1d!important; }
+html:root:root:root:root body.on-login #login-view { padding-top:14px!important;padding-bottom:20px!important;gap:10px!important; }
+.auth-hero { margin:4px 0 2px!important; } .auth-hero h1 { font-size:clamp(30px,5vw,40px)!important;margin:0 0 8px!important; }
+html:root:root:root:root body .auth-card { padding:18px 20px!important;gap:10px!important; }
+html:root:root:root:root body .auth-card input[type="text"], html:root:root:root:root body .auth-card input[type="password"] { min-height:44px!important;padding:10px 14px!important; }
+html:root:root:root:root body #li-btn, html:root:root:root:root body #su-btn { min-height:46px!important;margin-top:2px!important; }
+html:root:root:root:root body .acc-x, html:root:root:root:root body .acc-x:hover { background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;min-height:0!important; }
+html:root:root:root:root body .acc-x:hover { background:#3d3d3a!important; }
+
+
+html:root:root:root:root body.in-app #main-tabs > .tab-wrapper, html:root:root:root:root body.in-app #main-tabs > .tab-nav, html:root:root:root:root body.in-app #main-tabs > [role="tablist"] { display:none!important; }
+html:root:root:root:root body.in-app #topbar { min-height:0!important;padding:6px 10px 6px 14px!important; }
+html:root:root:root:root body #doc-select { padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important; }
+html:root:root:root:root body #doc-select label, html:root:root:root:root body #doc-select .container { display:flex!important;flex-direction:row!important;align-items:center!important;gap:10px!important;margin:0!important; }
+html:root:root:root:root body #doc-select [data-testid="block-info"] { margin:0!important;white-space:nowrap!important;flex:none!important; }
+html:root:root:root:root body #doc-select .wrap { flex:1 1 auto!important;min-width:0!important; }
+.home-fit details.guide-card > summary { display:grid!important;grid-template-columns:30px 1fr;gap:4px 8px!important;align-items:center!important;padding:9px 10px!important; }
+.home-fit .gc-ico { width:30px!important;height:30px!important;border-radius:9px!important; } .home-fit .gc-ico .ak-ico { width:17px;height:17px; }
+.home-fit .gc-body { display:contents!important; }
+.home-fit .gc-body b { font-size:13px!important;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.home-fit .gc-body > span { grid-column:1/-1;-webkit-line-clamp:1!important;font-size:11.5px!important; }
+html:root:root:root:root body.in-app #summary-out { height:calc(var(--body-h, 600px) - 140px)!important; }
+html:root:root:root:root body.in-app #assistant-chatbot { height:calc(var(--body-h, 600px) - 120px)!important; }
+html:root:root:root:root body.in-app .mm-wrap { max-height:calc(var(--body-h, 600px) - 110px)!important; }
+html:root:root:root:root body.in-app #main-tabs iframe { height:min(450px, calc(var(--body-h, 600px) - 170px))!important; }
+
+
+html:root:root:root:root body.in-app #assistant-chatbot { height:calc(var(--body-h, 600px) - 175px)!important; }
+
+
+html:root:root:root:root body .ak-pane > * { flex-shrink:0!important; }
+.home-fit .gc-body > span { display:none!important; }
+.home-fit .gc-body b { white-space:normal!important;overflow:visible!important; }
+html:root:root:root:root body details.guide-card[open] > summary { z-index:auto!important;position:static!important; }
+
+#scope-row { flex-wrap:nowrap!important;gap:8px!important; } #scope-row > * { flex:0 0 auto!important;width:auto!important; }
+html:root:root:root:root body .ak-pane .global-metrics { grid-template-columns:1fr 1fr!important; }
+
+html:root:root:root:root body.m-mode .ak-cols { flex-direction:column!important;flex-wrap:nowrap!important; }
+html:root:root:root:root body.m-mode .ak-cols > .ak-pane { min-width:0!important;width:100%!important;flex:1 1 auto!important; }
+html:root:root:root:root body.m-mode #scope-row { flex-wrap:wrap!important; } html:root:root:root:root body.m-mode #chat-scope .wrap { flex-wrap:wrap!important; }
+html:root:root:root:root body.m-mode.in-app #assistant-chatbot { height:calc(var(--body-h, 600px) - 215px)!important; }
+
+html:root:root:root:root body.m-mode #chat-scope { flex:1 1 100%!important;max-width:100%!important; }
 .oral-card { border:1px solid var(--ak-line);border-radius:18px;background:var(--ak-card);padding:22px 26px; }
 .oral-tag { display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ak-blue)!important;margin-bottom:8px; }
 .oral-card h3 { margin:0;font-size:21px;line-height:1.4;color:var(--ak-text)!important; }
@@ -5504,6 +5654,7 @@ I18N_SRC = r"""
   I18N.push(["Mes dossiers et modules", "My folders and modules"],["Importez vos PDF (même scannés) et rangez-les par module et par semestre.", "Import your PDFs (even scanned ones) and sort them by module and semester."],["Ajoutez un ou plusieurs PDF : AKORI lit le texte, lance l'OCR si la page est une image, puis indexe chaque page.", "Add one or more PDFs: AKORI reads the text, runs OCR if a page is an image, then indexes every page."],["Créez un module par matière (ex. Réseaux, Algorithmique) et choisissez son semestre.", "Create a module per subject (e.g. Networks, Algorithms) and pick its semester."],["Rangez directement vos nouveaux fichiers dans un module au moment de l'import.", "File your new documents straight into a module when you import them."],["Un semestre contient souvent plusieurs cours : un module les réunit pour les interroger ensemble.", "A semester often holds several courses: a module groups them so you can query them together."],["Importer un PDF", "Import a PDF"],["Les points clés du cours en un coup d'œil, dans votre langue.", "The key points of the course at a glance, in your language."],["Choisissez le cours actif en haut de la page.", "Pick the active course at the top of the page."],["Lancez « Générer le résumé » : le texte est conservé avec le cours.", "Click “Generate summary”: the text is saved with the course."],["Relisez-le la veille d'un examen, ou au début d'une séance.", "Reread it the day before an exam, or at the start of a session."],["Le résumé revient dans votre plan de révision comme première étape.", "The summary comes back in your revision plan as the first step."],["Générer le résumé", "Generate summary"],["Posez vos questions : la réponse s'appuie sur votre cours, avec la page citée.", "Ask your questions: the answer relies on your course, with the page cited."],["Choisissez où chercher : ce cours, tout un module, ou tout votre espace.", "Choose where to search: this course, a whole module, or your whole space."],["Lisez la réponse et ouvrez « Sources » pour voir les passages et les pages utilisés.", "Read the answer and open “Sources” to see the passages and pages used."],["Épinglez une réponse dans « À revoir », ou écoutez-la à voix haute.", "Pin an answer to “To review”, or listen to it aloud."],["Si l'information n'est pas dans vos cours, AKORI le dit au lieu d'inventer.", "If the information is not in your courses, AKORI says so instead of making it up."],["Poser une question", "Ask a question"],["Au moins 7 cartes en mode roulette pour mémoriser activement.", "At least 7 cards in roulette mode to memorize actively."],["Générez les cartes à partir du cours actif.", "Generate the cards from the active course."],["Cliquez pour stopper la roulette, essayez de répondre, puis affichez la réponse.", "Click to stop the roulette, try to answer, then reveal the answer."],["Marquez « Je savais » ou « À revoir » : les cartes à revoir reviennent dans votre plan.", "Mark “I knew it” or “To review”: cards to review come back in your plan."],["Mieux vaut 10 minutes chaque jour qu'une heure la veille : c'est la répétition espacée.", "10 minutes every day beat one hour the night before: that is spaced repetition."],["Lancer la roulette", "Spin the roulette"],["Testez-vous : correction expliquée, points forts et points faibles.", "Test yourself: explained corrections, strengths and weaknesses."],["Générez un quiz de 5 questions.", "Generate a 5-question quiz."],["Répondez, validez, lisez l'explication, puis passez à la suite.", "Answer, validate, read the explanation, then move on."],["Vos erreurs alimentent la carte de vos lacunes et les pages à relire.", "Your mistakes feed your gap map and the pages to reread."],["Un quiz raté n'est pas un échec : il indique exactement quelle page relire.", "A failed quiz is not a failure: it tells you exactly which page to reread."],["Passer un quiz", "Take a quiz"],["Répondez à l'oral ou à l'écrit, comme devant un examinateur.", "Answer aloud or in writing, as in front of an examiner."],["AKORI choisit un passage de votre cours et pose une question ouverte.", "AKORI picks a passage from your course and asks an open question."],["Dictez votre réponse au micro ou écrivez-la.", "Dictate your answer to the microphone or type it."],["Recevez une note sur 10, ce qui manquait, et la page à relire.", "Get a mark out of 10, what was missing, and the page to reread."],["Dire la réponse à voix haute révèle ce que vous maîtrisez vraiment.", "Saying the answer aloud reveals what you really master."],["Passer une colle", "Take an oral"],["Indiquez la date de l'examen : AKORI construit le plan jour par jour.", "Enter the exam date: AKORI builds a day-by-day plan."],["Saisissez la date, la portée (un cours, un module, tout) et le temps disponible par jour.", "Enter the date, the scope (a course, a module, everything) and your daily time."],["Le plan mélange vos points faibles et une répétition espacée (1, 3, 7 puis 14 jours).", "The plan mixes your weak points with spaced repetition (1, 3, 7 then 14 days)."],["Il se recalcule après chaque séance et vous indique les pages à relire.", "It recalculates after every session and shows the pages to reread."],["Un jour de repos est prévu : la mémoire consolide aussi quand vous ne travaillez pas.", "A rest day is planned: memory also consolidates when you are not working."],["Créer mon plan", "Create my plan"],["Retrouvez les réponses épinglées, cours par cours.", "Find your pinned answers, course by course."],["Épinglez une réponse de l'assistant depuis le chat.", "Pin an assistant answer from the chat."],["Retrouvez-la ici, rangée par cours.", "Find it here, sorted by course."],["Relisez-la ou écoutez-la avant l'examen.", "Reread it or listen to it before the exam."],["C'est votre fiche de révision personnelle, écrite avec vos propres questions.", "It is your personal revision sheet, written with your own questions."],["Ouvrir À revoir", "Open To review"],["Un état clair : flashcards, quiz et colle orale, cours par cours.", "A clear status: flashcards, quizzes and oral practice, course by course."],["Consultez la vue globale, puis le détail du cours choisi.", "Check the global view, then the detail of the chosen course."],["Chaque pourcentage précise sur quoi il porte (cartes maîtrisées, quiz terminés…).", "Each percentage states what it measures (mastered cards, completed quizzes…)."],["Repérez les notions à renforcer.", "Spot the concepts to reinforce."],["La progression d'un cours est la moyenne de ses trois activités.", "A course's progress is the average of its three activities."],["Voir ma progression", "See my progress"],["Votre journal de révision et la carte de vos lacunes.", "Your revision journal and the map of your gaps."],["Chaque séance est notée : quiz, flashcards, colle orale, questions.", "Every session is logged: quizzes, flashcards, oral practice, questions."],["Suivez votre série de jours et vos notions les moins réussies.", "Follow your day streak and your least mastered concepts."],["L'assistant adapte ses explications à votre niveau et à vos résultats.", "The assistant adapts its explanations to your level and your results."],["Plus vous révisez, plus les réponses s'ajustent à vous.", "The more you revise, the better the answers fit you."],["Ouvrir l'historique", "Open history"],["Réviser, c'est reprendre, comprendre, mémoriser et maîtriser : chaque notion, avec les mots et les exemples de votre cours.", "To revise is to revisit, understand, memorize and master: every concept, in the words and examples of your course."],["💡 Guide de révision : cliquez sur une fonction pour la découvrir en détail", "💡 Revision guide: click a feature to explore it in detail"],["AKORI transforme vos cours PDF en un espace de révision intelligent : résumé, flashcards roulette, quiz, colle orale, plan de révision et assistant RAG.", "AKORI turns your PDF courses into a smart revision space: summary, roulette flashcards, quiz, oral practice, revision plan and RAG assistant."],["Plan", "Plan"],["Assistant IA", "AI Assistant"],["Ajouter les nouveaux fichiers au module", "Add new files to the module"],["Sélectionnez un ou plusieurs PDF : extraction et indexation automatiques.", "Select one or more PDFs: automatic extraction and indexing."],["Un semestre contient souvent plusieurs cours. Regroupez-les par module (matière) et par semestre pour interroger simultanément plusieurs unités d'enseignement (ex. Systèmes d'exploitation, Réseaux, Algorithmique) au sein d'un même espace de travail : dans l'Assistant IA, choisissez « Mon module » ou « Tout mon espace ».", "A semester often holds several courses. Group them by module (subject) and semester to query several teaching units at once (e.g. Operating Systems, Networks, Algorithms) within one workspace: in the AI Assistant, choose “My module” or “My whole space”."],["AKORI suit vos interactions (quiz, flashcards, colle orale, questions) pour cartographier vos lacunes conceptuelles et adapter dynamiquement le niveau d'explication des réponses générées par l'assistant.", "AKORI tracks your interactions (quizzes, flashcards, oral practice, questions) to map your conceptual gaps and dynamically adapt the explanation level of the assistant's answers."]);
   I18N.push(["Générez un quiz de 5 questions.", "Generate a 5-question quiz."],["Touchez une réponse : la correction et l'explication s'affichent aussitôt, sans valider.", "Tap an answer: the correction and explanation appear instantly, no need to validate."],["Glissez vers la gauche pour passer à la question suivante. Vos erreurs alimentent la carte de vos lacunes.", "Swipe left to go to the next question. Your mistakes feed your gap map."],["La carte mentale du cours, d'un seul regard.", "The course mind map at a glance."],["Choisissez le cours actif puis lancez « Générer la mindmap ».", "Pick the active course then click “Generate mind map”."],["Le thème est au centre, les grandes notions autour, leurs détails au bout des branches.", "The theme is at the center, the main concepts around it, their details at the branch tips."],["Cliquez sur une branche pour la replier ou la déplier et réviser bloc par bloc.", "Click a branch to fold or unfold it and revise block by block."],["La carte est conservée avec le cours : vous la retrouvez à chaque visite.", "The map is saved with the course: you find it at every visit."],["Ouvrir la mindmap", "Open the mind map"],["Mindmap", "Mind map"],["Mindmap du cours", "Course mind map"],["À propos", "About"],["✦ Générer la mindmap", "✦ Generate mind map"],["Générer la mindmap", "Generate mind map"],["La carte mentale du cours actif : le thème au centre, les grandes notions autour, leurs détails au bout. Cliquez sur une branche pour la replier.", "The mind map of the active course: the theme at the center, main concepts around it, details at the tips. Click a branch to fold it."],["Touchez une réponse : la correction s'affiche aussitôt.", "Tap an answer: the correction appears instantly."],["Cliquez sur une branche pour la replier ou la déplier.", "Click a branch to fold or unfold it."],["Aucune mindmap pour ce cours.", "No mind map for this course."],["← Présentation d'AKORI", "← About AKORI"]);
   I18N.push(["Touchez une réponse : la correction s'affiche aussitôt. Glissez vers la gauche pour passer à la question suivante.", "Tap an answer: the correction appears instantly. Swipe left to go to the next question."]);
+  I18N.push(["Mes documents", "My documents"],["Modules · semestres", "Modules · semesters"],["Ajouter des PDF", "Add PDFs"],["Ranger les nouveaux PDF dans le module", "Put new PDFs in the module"],["Nouveau module", "New module"],["Supprimer", "Delete"],["Corriger", "Check"],["Dicter", "Dictate"],["Nouvelle question", "New question"],["Votre réponse", "Your answer"],["Écrivez ou dictez votre réponse…", "Type or dictate your answer…"],["La correction s'affichera ici.", "The correction will appear here."],["Note sur 10, points manquants et page à relire.", "Mark out of 10, missing points and page to reread."],["✦ Générer le résumé", "✦ Generate summary"],["Les points clés du cours actif, conservés avec le document.", "Key points of the active course, saved with the document."],["Vue d'ensemble", "Overview"],["Cours actif", "Active course"],["Mon examen", "My exam"],["Cours concernés", "Courses included"],["Minutes par jour", "Minutes per day"],["Mon journal de révision", "My revision journal"],["Thème clair ou sombre.", "Light or dark theme."],["Interface et réponses de l'IA.", "Interface and AI answers."],["Que voulez-vous faire ?", "What do you want to do?"],["Touchez une fonction pour voir comment elle marche.", "Tap a feature to see how it works."],["Cours importés", "Imported courses"],["Passages indexés (cours actif)", "Indexed passages (active course)"],["Questions posées (cours actif)", "Questions asked (active course)"],["Progression du cours actif", "Active course progress"],["AKORI · Espace de révision", "AKORI · Revision space"],["Vos cours,", "Your courses,"],["votre réussite", "your success"],["Un assistant de révision qui ne répond qu'avec vos propres documents.", "A revision assistant that answers only from your own documents."],["E-mail", "Email"],["Entrez votre adresse e-mail", "Enter your email address"],["Votre mot de passe", "Your password"],["Continuer", "Continue"],["OU", "OR"],["Créer un compte", "Create an account"],["J'ai déjà un compte", "I already have an account"],["Découvrir AKORI", "Discover AKORI"],["Comptes récents", "Recent accounts"],["Autre compte", "Other account"],["Une adresse réelle que vous consultez.", "A real address you check."],["Retapez le mot de passe", "Retype the password"],["Vos documents restent dans votre espace personnel. AKORI ne répond qu'à partir de vos cours.", "Your documents stay in your personal space. AKORI answers only from your courses."]);
   const EXACT = new Map(I18N.map(([fr, en]) => [fr.trim(), en]));
   const codeOf = (label) => /English/.test(String(label)) ? 'en' : 'fr';
   const labelOf = (code) => code === 'en' ? 'English' : 'Français';
@@ -5678,9 +5829,9 @@ I18N_SRC = r"""
 
 THEME_INIT_JS = r"""
 () => {
-  let dark = false, pref = null;
+  let dark = true, pref = null;
   try {
-    dark = localStorage.getItem('akori-theme') === 'dark';
+    dark = localStorage.getItem('akori-theme') !== 'light';
     pref = localStorage.getItem('akori-sidebar');
   } catch (e) {}
   const small = window.innerWidth <= 900;
@@ -6007,6 +6158,103 @@ AKORI_NAV_JS = r"""
     hero.style.setProperty('--mx', (event.clientX - r.left) + 'px');
     hero.style.setProperty('--my', (event.clientY - r.top) + 'px');
   });
+  // Écran unique : hauteur disponible pour le corps de page (en-tête séparé)
+  const fitScreen = () => {
+    const mc = document.getElementById('main-column');
+    if (mc) {
+      const top = Math.max(0, mc.getBoundingClientRect().top + (window.scrollY || 0));
+      document.body.style.setProperty('--mc-top', top + 'px');
+    }
+    const mt = document.getElementById('main-tabs');
+    if (mt) document.body.style.setProperty('--body-h', mt.clientHeight + 'px');
+    const active = document.querySelector('#sidebar .navbtn.nav-active');
+    const title = document.getElementById('ak-page-title');
+    if (active && title) { const t = (active.textContent || '').trim(); if (t && title.textContent !== t) title.textContent = t; }
+    const lw = document.getElementById('login-wrap');
+    document.body.classList.toggle('on-login', !!(lw && lw.offsetParent !== null));
+  };
+  window.addEventListener('resize', fitScreen);
+  window.setInterval(fitScreen, 300);
+  // Guide de l'accueil : une seule fiche ouverte, fermeture par la croix ou en touchant à côté
+  document.addEventListener('toggle', (event) => {
+    const d = event.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('guide-card') || !d.open) return;
+    document.querySelectorAll('details.guide-card[open]').forEach((o) => { if (o !== d) o.open = false; });
+    const det = d.querySelector('.gc-detail');
+    if (det && !det.querySelector('.gc-close')) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'gc-close'; b.textContent = '✕';
+      const t = document.createElement('div'); t.className = 'gc-detail-title'; t.textContent = (d.querySelector('.gc-body b') || {}).textContent || '';
+      det.prepend(t); det.prepend(b);
+    }
+  }, true);
+  document.addEventListener('click', (event) => {
+    const open = document.querySelector('details.guide-card[open]');
+    if (!open) return;
+    if (event.target.closest('.gc-close') || event.target.closest('.ak-go') || !event.target.closest('.gc-detail')) { open.open = false; if (!event.target.closest('.ak-go')) event.preventDefault(); }
+  }, true);
+  // Comptes récents sur l'écran de connexion (comme Messenger)
+  const ACC_KEY = 'akori-accounts';
+  const accLoad = () => { try { return JSON.parse(localStorage.getItem(ACC_KEY) || '[]'); } catch (e) { return []; } };
+  const accSave = (list) => { try { localStorage.setItem(ACC_KEY, JSON.stringify(list.slice(0, 4))); } catch (e) {} };
+  const accRemember = () => {
+    const badge = document.querySelector('#user-badge .user-badge');
+    const mail = badge && badge.querySelector('.ub-mail');
+    if (!mail) return;
+    const email = (mail.textContent || '').trim();
+    const name = ((badge.querySelector('.ub-text b') || {}).textContent || email).trim();
+    const img = badge.querySelector('img.ub-avatar');
+    const entry = { email, name, avatar: img ? img.getAttribute('src') : '' };
+    const list = accLoad().filter((a) => a.email !== email);
+    const prev = accLoad().find((a) => a.email === email);
+    if (prev && prev.name === entry.name && prev.avatar === entry.avatar && accLoad()[0] && accLoad()[0].email === email) return;
+    list.unshift(entry); accSave(list);
+  };
+  const setField = (input, value) => {
+    const proto = input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const esc = (t) => String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const accRender = () => {
+    const box = document.getElementById('ak-accounts');
+    if (!box) return;
+    const list = accLoad();
+    const sig = JSON.stringify(list.map((a) => [a.email, a.name, (a.avatar || '').length]));
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    if (!list.length) { box.innerHTML = ''; return; }
+    const cards = list.map((a, i) => '<div class="acc" data-i="' + i + '"><button type="button" class="acc-x" title="Retirer">×</button>' +
+      (a.avatar ? '<img class="acc-av" src="' + esc(a.avatar) + '" alt="">' : '<div class="acc-av">' + esc((a.name || a.email || '?')[0].toUpperCase()) + '</div>') +
+      '<div class="acc-name">' + esc(a.name || a.email) + '</div></div>').join('');
+    box.innerHTML = '<div class="acc-title">Comptes récents</div><div class="acc-row">' + cards +
+      '<div class="acc acc-add"><div class="acc-av">+</div><div class="acc-name">Autre compte</div></div></div><div class="acc-pick"></div>';
+  };
+  document.addEventListener('click', (event) => {
+    const acc = event.target.closest && event.target.closest('#ak-accounts .acc');
+    if (!acc) return;
+    const panel = document.getElementById('login-panel');
+    const user = document.querySelector('#li-user input, #li-user textarea');
+    const pass = document.querySelector('#li-pass input');
+    const list = accLoad();
+    if (event.target.closest('.acc-x')) {
+      const i = +acc.dataset.i; list.splice(i, 1); accSave(list);
+      if (panel) panel.classList.remove('picked'); accRender(); return;
+    }
+    document.querySelectorAll('#ak-accounts .acc').forEach((x) => x.classList.toggle('on', x === acc));
+    if (acc.classList.contains('acc-add')) {
+      if (panel) panel.classList.remove('picked');
+      if (user) { setField(user, ''); user.focus(); }
+      return;
+    }
+    const a = list[+acc.dataset.i];
+    if (!a || !user) return;
+    setField(user, a.email);
+    const pick = document.querySelector('#ak-accounts .acc-pick');
+    if (pick) pick.innerHTML = 'Continuer en tant que <b>' + esc(a.name || a.email) + '</b>';
+    if (panel) panel.classList.add('picked');
+    if (pass) window.setTimeout(() => pass.focus(), 60);
+  });
+  window.setInterval(() => { accRemember(); accRender(); }, 700);
   // Téléphone : menu en tiroir (bouton ☰ flottant), pages pleine largeur
   const mq = window.matchMedia('(max-width: 700px)');
   const applyMode = () => {
@@ -6161,7 +6409,8 @@ def _user_badge_html(key):
     name = _display_name(key)
     role = "Administrateur" if u.get("role") == "admin" else "Utilisateur"
     return (f"<div class='user-badge' title='Mon profil'>{_avatar_html(key)}"
-            f"<div class='ub-text'><b>{_escape_html(name)}</b><span>{role}</span></div></div>")
+            f"<div class='ub-text'><b>{_escape_html(name)}</b><span>{role}</span></div>"
+            f"<span class='ub-mail'>{_escape_html(str(u.get('username', key)))}</span></div>")
 
 
 # ---------------- profil : photo, prénom, niveau, objectif
@@ -6856,30 +7105,33 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
         gr.HTML(landing_html())
         land_login_btn = gr.Button("login", elem_id="land-login-btn", elem_classes="akori-hidden")
       with gr.Column(visible=False, elem_id="login-wrap") as login_wrap:
-        back_land = gr.Button("← Présentation d'AKORI", elem_id="back-land", elem_classes="link-btn")
-        gr.HTML(f"<div class='auth-brand'><img class='brand-logo' src='{LOGO_DATA_URI}' alt='AKORI'><span>AKORI</span></div>")
-        with gr.Column(visible=True, elem_id="login-panel", elem_classes="auth-panel") as login_panel:
-            gr.HTML("<div class='auth-title'><h1>Content de te revoir</h1><p>Connecte-toi pour accéder à tes cours</p></div>")
-            li_user = gr.Textbox(label="Email", placeholder="ton@email.com", elem_id="li-user")
-            li_pass = gr.Textbox(label="Mot de passe", type="password", placeholder="••••••••", elem_id="li-pass")
+        # Connexion façon Claude : logo, grande accroche, carte sobre ; comptes récents façon Messenger
+        with gr.Row(elem_id="auth-top"):
+            gr.HTML(f"<div class='auth-logo'><img src='{LOGO_DATA_URI}' alt='AKORI'><span>AKORI</span></div>")
+            back_land = gr.Button("Découvrir AKORI", elem_id="back-land", elem_classes="link-btn", scale=0, min_width=150)
+        gr.HTML("<div class='auth-hero'><h1>Vos cours,<br>votre réussite</h1>"
+                "<p>Un assistant de révision qui ne répond qu'avec vos propres documents.</p></div>")
+        with gr.Column(visible=True, elem_id="login-panel", elem_classes="auth-panel auth-card") as login_panel:
+            gr.HTML("<div id='ak-accounts'></div>")
+            li_user = gr.Textbox(label="E-mail", placeholder="Entrez votre adresse e-mail", elem_id="li-user")
+            li_pass = gr.Textbox(label="Mot de passe", type="password", placeholder="Votre mot de passe", elem_id="li-pass")
             li_remember = gr.State(True)
-            li_btn = gr.Button("Se connecter", elem_id="li-btn")
+            li_btn = gr.Button("Continuer", elem_id="li-btn")
             login_status = gr.Markdown("", elem_id="login-status", elem_classes="auth-status")
             forgot_btn = gr.Button("Mot de passe oublié ?", elem_classes="link-btn")
-            with gr.Row(elem_classes="auth-foot-row"):
-                gr.HTML("<span>Pas encore de compte ?</span>")
-                go_register = gr.Button("Créer un compte", elem_classes="link-btn accent")
-        with gr.Column(visible=False, elem_id="register-panel", elem_classes="auth-panel") as register_panel:
-            gr.HTML("<div class='auth-title'><h1>Crée ton compte</h1><p>Gratuit, sans carte bancaire</p></div>")
-            su_user = gr.Textbox(label="Email", placeholder="prenom.nom@gmail.com", elem_id="su-user", info="Une adresse e-mail réelle que vous consultez : les adresses jetables ou inexistantes sont refusées.")
+            gr.HTML("<div class='auth-or'><span>OU</span></div>")
+            go_register = gr.Button("Créer un compte", elem_classes="auth-alt", elem_id="go-register")
+        with gr.Column(visible=False, elem_id="register-panel", elem_classes="auth-panel auth-card") as register_panel:
+            gr.HTML("<div class='auth-card-title'>Créer un compte</div>")
+            su_user = gr.Textbox(label="E-mail", placeholder="prenom.nom@gmail.com", elem_id="su-user", info="Une adresse réelle que vous consultez.")
             su_pass = gr.Textbox(label="Mot de passe", type="password", placeholder="8 caractères minimum", elem_id="su-pass")
-            su_pass2 = gr.Textbox(label="Confirmer le mot de passe", type="password", placeholder="••••••••", elem_id="su-pass2")
+            su_pass2 = gr.Textbox(label="Confirmer le mot de passe", type="password", placeholder="Retapez le mot de passe", elem_id="su-pass2")
             su_remember = gr.State(True)
             su_btn = gr.Button("Créer mon compte", elem_id="su-btn")
             register_status = gr.Markdown("", elem_id="register-status", elem_classes="auth-status")
-            with gr.Row(elem_classes="auth-foot-row"):
-                gr.HTML("<span>Déjà un compte ?</span>")
-                go_login = gr.Button("Se connecter", elem_classes="link-btn accent")
+            gr.HTML("<div class='auth-or'><span>OU</span></div>")
+            go_login = gr.Button("J'ai déjà un compte", elem_classes="auth-alt", elem_id="go-login")
+        gr.HTML("<div class='auth-legal'>Vos documents restent dans votre espace personnel. AKORI ne répond qu'à partir de vos cours.</div>")
 
     # ------------------------------------------------------------ vue : onboarding (4 étapes)
     ob_step = gr.State(1)
@@ -6930,72 +7182,69 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                 user_badge = gr.HTML("", elem_id="user-badge")
 
             with gr.Column(scale=4, min_width=280, elem_id="main-column"):
+                # En-tête : page active + cours actif (séparé du corps de la page)
                 with gr.Row(elem_id="topbar"):
-                    gr.Markdown("### AKORI · Espace de révision")
-                    doc_selector = gr.Dropdown(label="Cours actif", choices=list(documents_db.keys()), value=(next(iter(documents_db), None)), scale=2)
+                    gr.HTML("<div class='pt-wrap'><span class='pt-ico'></span><div><div id='ak-page-title'>Accueil</div>"
+                            "<div class='pt-sub'>AKORI · Espace de révision</div></div></div>", elem_id="topbar-title")
+                    doc_selector = gr.Dropdown(label="Cours actif", choices=list(documents_db.keys()), value=(next(iter(documents_db), None)),
+                                               scale=0, min_width=260, elem_id="doc-select")
 
                 with gr.Tabs(elem_id="main-tabs") as tabs:
                     with gr.Tab("Accueil", id="home") as tab_home:
                         home_html = gr.HTML(dashboard_html(doc_selector.value))
-                        start_review = gr.Button("Commencer la révision →", variant="primary")
+                        start_review = gr.Button("Commencer la révision →", variant="primary", elem_classes="akori-hidden")
 
                     with gr.Tab("Mes dossiers", id="courses") as tab_courses:
-                        gr.Markdown("## Mes dossiers")
-                        gr.Markdown("Tous vos supports PDF sont centralisés ici. Dès qu'un document est sélectionné, AKORI extrait son contenu et construit automatiquement son index.")
-                        with gr.Row(elem_id="documents-row", equal_height=True):
-                            docs_html = gr.HTML(documents_html_v16(doc_selector.value), scale=3)
-                            pdf_input = gr.UploadButton(
-                                "＋\nAjouter un document",
-                                file_types=[".pdf"],
-                                file_count="multiple",
-                                type="filepath",
-                                elem_id="add-document-tile",
-                                scale=1,
-                            )
-                        upload_mod = gr.Dropdown(label="Ajouter les nouveaux fichiers au module", choices=_module_choices(), value="", elem_id="upload-mod")
-                        upload_status = gr.Markdown("Sélectionnez un ou plusieurs PDF : extraction et indexation automatiques.", elem_id="upload-status")
-                        gr.Markdown("### Cours actif")
-                        course_info = gr.HTML(course_overview_html(doc_selector.value))
-                        gr.Markdown("### Mes modules · espace semestriel")
-                        gr.Markdown("Un semestre contient souvent plusieurs cours. Regroupez-les par module (matière) et par semestre pour interroger simultanément plusieurs unités d'enseignement (ex. Systèmes d'exploitation, Réseaux, Algorithmique) au sein d'un même espace de travail : dans l'Assistant IA, choisissez « Mon module » ou « Tout mon espace ».")
-                        modules_box = gr.HTML(modules_html(doc_selector.value))
-                        with gr.Row(elem_id="module-row"):
-                            mod_name = gr.Textbox(label="Nouveau module", placeholder="Ex. : Algorithmique", scale=3, elem_id="mod-name")
-                            mod_sem = gr.Dropdown(label="Semestre", choices=SEMESTERS, value=SEMESTERS[0], scale=1, elem_id="mod-sem")
-                            mod_create = gr.Button("Créer le module", variant="primary", scale=1, elem_id="mod-create")
-                        with gr.Row(elem_id="module-row2"):
-                            mod_pick = gr.Dropdown(label="Module du cours actif", choices=_module_choices(), value="", scale=3, elem_id="mod-pick")
-                            mod_del = gr.Button("Supprimer ce module", scale=1, elem_id="mod-del")
-                        mod_status = gr.Markdown("", elem_id="mod-status")
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=3, min_width=300, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Mes documents</div>")
+                                with gr.Row(elem_id="documents-row", equal_height=True):
+                                    docs_html = gr.HTML(documents_html_v16(doc_selector.value), scale=3)
+                                    pdf_input = gr.UploadButton(
+                                        "＋\nAjouter des PDF",
+                                        file_types=[".pdf"],
+                                        file_count="multiple",
+                                        type="filepath",
+                                        elem_id="add-document-tile",
+                                        scale=1,
+                                    )
+                                upload_mod = gr.Dropdown(label="Ranger les nouveaux PDF dans le module", choices=_module_choices(), value="", elem_id="upload-mod")
+                                upload_status = gr.Markdown("", elem_id="upload-status")
+                                course_info = gr.HTML(course_overview_html(doc_selector.value), elem_classes="akori-hidden")
+                            with gr.Column(scale=2, min_width=280, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Modules · semestres</div>")
+                                modules_box = gr.HTML(modules_html(doc_selector.value))
+                                with gr.Row(elem_id="module-row"):
+                                    mod_name = gr.Textbox(label="Nouveau module", placeholder="Ex. : Réseaux", scale=3, elem_id="mod-name")
+                                    mod_sem = gr.Dropdown(label="Semestre", choices=SEMESTERS, value=SEMESTERS[0], scale=1, min_width=90, elem_id="mod-sem")
+                                mod_create = gr.Button("Créer le module", variant="primary", elem_id="mod-create")
+                                with gr.Row(elem_id="module-row2"):
+                                    mod_pick = gr.Dropdown(label="Module du cours actif", choices=_module_choices(), value="", scale=3, elem_id="mod-pick")
+                                    mod_del = gr.Button("Supprimer", scale=1, min_width=90, elem_id="mod-del")
+                                mod_status = gr.Markdown("", elem_id="mod-status")
 
                     with gr.Tab("Réviser", id="review") as tab_review:
-                        gr.Markdown("## Réviser ce cours")
-                        gr.Markdown("Une vue centrale pour accéder rapidement au résumé, aux flashcards, au quiz et à l'assistant.")
                         review_cards = gr.HTML(course_overview_html(doc_selector.value))
-                        with gr.Row():
+                        with gr.Row(elem_classes="ak-toolbar"):
                             review_summary = gr.Button("Résumé", variant="secondary")
                             review_flash = gr.Button("Flashcards", variant="primary")
                             review_quiz = gr.Button("Quiz / QCM", variant="primary")
                             review_chat = gr.Button("Assistant IA", variant="secondary")
 
                     with gr.Tab("Flashcards", id="flashcards"):
-                        gr.Markdown("## Flashcards — Mode Roulette")
-                        with gr.Row():
-                            generate_flash = gr.Button("✦ Générer les flashcards", variant="primary")
+                        with gr.Row(elem_classes="ak-toolbar"):
+                            generate_flash = gr.Button("✦ Générer les flashcards", variant="primary", scale=0, min_width=230)
                             flash_status = gr.Markdown("", elem_id="flash-status")
                         flash_view = gr.HTML(flashcard_view([], 0, False))
-                        with gr.Column(visible=False) as flash_actions:
+                        with gr.Row(visible=False, elem_classes="ak-toolbar") as flash_actions:
                             flash_reveal = gr.Button("Afficher la réponse", variant="primary")
-                            with gr.Row():
-                                flash_known = gr.Button("✓ Je savais", variant="primary")
-                                flash_review = gr.Button("↻ À revoir")
+                            flash_known = gr.Button("✓ Je savais", variant="primary")
+                            flash_review = gr.Button("↻ À revoir")
 
                     with gr.Tab("Quiz / QCM", id="quiz"):
-                        gr.Markdown("## Quiz d'évaluation")
-                        gr.Markdown("Touchez une réponse : la correction s'affiche aussitôt. Glissez vers la gauche pour passer à la question suivante.")
-                        with gr.Row():
-                            generate_quiz_btn = gr.Button("✦ Générer le quiz", variant="primary")
-                            quiz_restart = gr.Button("🔁 Rejouer")
+                        with gr.Row(elem_classes="ak-toolbar"):
+                            generate_quiz_btn = gr.Button("✦ Générer le quiz", variant="primary", scale=0, min_width=200)
+                            quiz_restart = gr.Button("🔁 Rejouer", scale=0, min_width=130)
                             quiz_status = gr.Markdown("")
                         quiz_view_box = gr.HTML(quiz_view([], 0))
                         quiz_choice = gr.Radio(
@@ -7008,34 +7257,37 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                         quiz_next = gr.Button(NEXT_LABEL, elem_id="quiz_next", elem_classes="akori-hidden")
 
                     with gr.Tab("Colle orale", id="oral"):
-                        gr.Markdown("## Colle orale")
-                        gr.Markdown("AKORI vous interroge sur votre cours, comme à l'oral. Répondez à l'écrit ou à la voix : la correction se base uniquement sur le contenu du cours et vous indique la page à relire.")
                         oral_state = gr.State({})
-                        oral_card = gr.HTML(oral_card_html(None))
-                        with gr.Row():
-                            oral_new = gr.Button("Nouvelle question", variant="primary", elem_id="oral-new")
-                            oral_mic = gr.Button("🎤 Dicter ma réponse", elem_id="oral-mic")
-                        oral_answer = gr.Textbox(lines=5, label="Votre réponse", placeholder="Écrivez votre réponse ici, ou cliquez sur « Dicter ma réponse »…", elem_id="oral-answer")
-                        oral_submit = gr.Button("Corriger ma réponse", variant="primary", elem_id="oral-submit")
-                        oral_status = gr.Markdown("", elem_id="oral-status")
-                        oral_result = gr.HTML("")
-                        oral_history = gr.HTML("")
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                oral_card = gr.HTML(oral_card_html(None))
+                                oral_answer = gr.Textbox(lines=4, max_lines=8, label="Votre réponse", placeholder="Écrivez ou dictez votre réponse…", elem_id="oral-answer")
+                                with gr.Row(elem_classes="ak-toolbar"):
+                                    oral_new = gr.Button("Nouvelle question", elem_id="oral-new")
+                                    oral_mic = gr.Button("🎤 Dicter", elem_id="oral-mic")
+                                    oral_submit = gr.Button("Corriger", variant="primary", elem_id="oral-submit")
+                                oral_status = gr.Markdown("", elem_id="oral-status")
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                oral_result = gr.HTML(ORAL_EMPTY)
+                                oral_history = gr.HTML("")
 
                     with gr.Tab("Résumé", id="summary"):
-                        gr.Markdown("## Résumé du cours")
-                        summary_btn = gr.Button("Générer le résumé", variant="primary")
-                        summary_output = gr.Markdown("Sélectionnez un cours puis lancez la génération.")
+                        with gr.Row(elem_classes="ak-toolbar"):
+                            summary_btn = gr.Button("✦ Générer le résumé", variant="primary", scale=0, min_width=220, elem_id="sum-gen")
+                            gr.HTML("<div class='tb-hint'>Les points clés du cours actif, conservés avec le document.</div>")
+                        summary_output = gr.Markdown("Sélectionnez un cours puis lancez la génération.", elem_id="summary-out")
 
                     with gr.Tab("Mindmap", id="mindmap") as tab_mindmap:
-                        gr.Markdown("## Mindmap du cours")
-                        gr.Markdown("La carte mentale du cours actif : le thème au centre, les grandes notions autour, leurs détails au bout. Cliquez sur une branche pour la replier.")
-                        mm_btn = gr.Button("✦ Générer la mindmap", variant="primary", elem_id="mm-gen")
-                        mm_status = gr.Markdown("", elem_id="mm-status")
+                        with gr.Row(elem_classes="ak-toolbar"):
+                            mm_btn = gr.Button("✦ Générer la mindmap", variant="primary", elem_id="mm-gen", scale=0, min_width=220)
+                            mm_status = gr.Markdown("", elem_id="mm-status")
                         mm_box = gr.HTML(mindmap_html(None))
 
                     with gr.Tab("Assistant IA", id="assistant"):
-                        gr.Markdown("## Assistant AKORI")
-                        gr.Markdown("Posez une question sur le cours actif. Le moteur récupère d'abord les passages pertinents avec FAISS, puis Gemini génère la réponse à partir du contexte récupéré.")
+                        with gr.Row(elem_classes="ak-toolbar", elem_id="scope-row"):
+                            gr.HTML("<div class='tb-hint'>Chercher dans :</div>")
+                            chat_scope = gr.Radio(choices=[("Ce cours", "doc"), ("Mon module", "module"), ("Tout mon espace", "all")], value="doc",
+                                                  show_label=False, container=False, elem_id="chat-scope", scale=0)
                         chatbot = gr.Chatbot(
                             value=_chat_history_for_ui(doc_selector.value) if doc_selector.value else [],
                             height=470,
@@ -7049,70 +7301,71 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                                 {"left": "\\(", "right": "\\)", "display": False},
                             ],
                         )
-                        chat_scope = gr.Radio(choices=[("Ce cours", "doc"), ("Mon module", "module"), ("Tout mon espace", "all")], value="doc",
-                                              label="Chercher dans", elem_id="chat-scope")
-                        with gr.Row():
+                        with gr.Row(elem_id="assistant-bar"):
                             msg_input = gr.Textbox(placeholder="Posez une question sur le cours…", show_label=False, scale=5, elem_id="assistant-input")
-                            send_btn = gr.Button("Envoyer", variant="primary", scale=1, elem_id="assistant-send")
+                            send_btn = gr.Button("Envoyer", variant="primary", scale=0, min_width=110, elem_id="assistant-send")
 
                     with gr.Tab("Progression", id="progress"):
-                        gr.Markdown("## Ma progression")
-                        gr.Markdown("Commencez par la vue globale, puis consultez le détail du cours sélectionné.")
-                        global_progress_output = gr.HTML(global_progress_html(doc_selector.value))
-                        gr.Markdown("### Détail du cours sélectionné")
-                        progress_output = gr.HTML(progress_detail_html(doc_selector.value))
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Vue d'ensemble</div>")
+                                global_progress_output = gr.HTML(global_progress_html(doc_selector.value))
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Cours actif</div>")
+                                progress_output = gr.HTML(progress_detail_html(doc_selector.value))
 
                     with gr.Tab("À revoir", id="reviewq") as tab_reviewq:
-                        gr.Markdown("## À revoir")
-                        gr.Markdown("Les réponses de l'assistant que vous épinglez depuis le chat sont rangées ici, cours par cours. Relisez-les, ou écoutez-les, avant l'examen.")
                         pins_box = gr.HTML(pins_view(doc_selector.value))
 
                     with gr.Tab("Paramètres", id="settings"):
-                        gr.Markdown("## Paramètres")
-                        gr.Markdown("Personnalisez AKORI. Vos choix sont mémorisés dans ce navigateur.")
-                        with gr.Row(elem_classes="set-card"):
-                            gr.HTML("<div class='set-text'><div class='set-title'>Mode sombre</div><div class='set-desc'>Basculez entre le thème clair et le thème sombre d'un seul clic.</div></div>")
-                            theme_toggle = gr.Button(" ", elem_id="theme-toggle-btn", scale=0, min_width=84)
-                        with gr.Row(elem_classes="set-card"):
-                            gr.HTML("<div class='set-text'><div class='set-title'>Langue</div><div class='set-desc'>Langue de l'interface et des réponses générées par l'IA.</div></div>")
-                            lang_choice = gr.Radio(choices=LANG_CHOICES, value="Français", show_label=False, container=False, elem_id="lang-choice", scale=0)
-                        gr.Markdown("### À propos")
-                        gr.HTML(about_html())
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                with gr.Row(elem_classes="set-card"):
+                                    gr.HTML("<div class='set-text'><div class='set-title'>Mode sombre</div><div class='set-desc'>Thème clair ou sombre.</div></div>")
+                                    theme_toggle = gr.Button(" ", elem_id="theme-toggle-btn", scale=0, min_width=84)
+                                with gr.Row(elem_classes="set-card"):
+                                    gr.HTML("<div class='set-text'><div class='set-title'>Langue</div><div class='set-desc'>Interface et réponses de l'IA.</div></div>")
+                                    lang_choice = gr.Radio(choices=LANG_CHOICES, value="Français", show_label=False, container=False, elem_id="lang-choice", scale=0)
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                gr.HTML(about_html())
 
                     with gr.Tab("Profil", id="profile"):
-                        gr.Markdown("## Mon profil")
-                        gr.Markdown("Ajoutez votre photo et ajustez vos informations. Elles apparaissent dans le menu et sur l'accueil.")
-                        prof_card = gr.HTML("")
-                        with gr.Row():
-                            prof_photo = gr.UploadButton("Ajouter une photo", file_types=["image"], file_count="single", type="filepath", elem_id="prof-photo")
-                            prof_remove = gr.Button("Retirer la photo", elem_id="prof-remove")
-                        prof_name = gr.Textbox(label="Prénom", placeholder="Ton prénom", elem_id="prof-name")
-                        prof_level = gr.Radio(choices=PROF_LEVELS, label="Niveau", elem_id="prof-level")
-                        prof_goal = gr.Radio(choices=PROF_GOALS, label="Objectif", elem_id="prof-goal")
-                        prof_save = gr.Button("Enregistrer", variant="primary", elem_id="prof-save")
-                        prof_status = gr.Markdown("", elem_id="prof-status")
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=1, min_width=280, elem_classes="ak-pane"):
+                                prof_card = gr.HTML("")
+                                with gr.Row(elem_classes="ak-toolbar"):
+                                    prof_photo = gr.UploadButton("Ajouter une photo", file_types=["image"], file_count="single", type="filepath", elem_id="prof-photo")
+                                    prof_remove = gr.Button("Retirer la photo", elem_id="prof-remove")
+                            with gr.Column(scale=1, min_width=280, elem_classes="ak-pane"):
+                                prof_name = gr.Textbox(label="Prénom", placeholder="Ton prénom", elem_id="prof-name")
+                                prof_level = gr.Radio(choices=PROF_LEVELS, label="Niveau", elem_id="prof-level")
+                                prof_goal = gr.Radio(choices=PROF_GOALS, label="Objectif", elem_id="prof-goal")
+                                prof_save = gr.Button("Enregistrer", variant="primary", elem_id="prof-save")
+                                prof_status = gr.Markdown("", elem_id="prof-status")
 
                     with gr.Tab("Plan de révision", id="plan") as tab_plan:
-                        gr.Markdown("## Plan de révision intelligent")
-                        gr.Markdown("Indiquez la date de votre examen. AKORI combine vos points faibles (quiz et flashcards « À revoir ») avec une répétition espacée et propose un plan jour par jour, avec les pages à relire.")
-                        with gr.Row(elem_id="plan-form"):
-                            plan_date = gr.Textbox(label="Date de l'examen", placeholder="AAAA-MM-JJ", elem_id="plan-date", scale=2)
-                            plan_name = gr.Textbox(label="Intitulé (facultatif)", placeholder="Ex. : Partiel d'algorithmique", elem_id="plan-name", scale=3)
-                        with gr.Row(elem_id="plan-form2"):
-                            plan_scope = gr.Dropdown(label="Portée du plan", choices=_plan_scope_choices(), value="all", elem_id="plan-scope", scale=3)
-                            plan_minutes = gr.Slider(10, 240, value=40, step=5, label="Minutes de révision par jour", elem_id="plan-minutes", scale=3)
-                        with gr.Row():
-                            plan_btn = gr.Button("Générer / mettre à jour le plan", variant="primary", elem_id="plan-save")
-                            plan_del = gr.Button("Supprimer le plan", elem_id="plan-clear")
-                        plan_status = gr.Markdown("", elem_id="plan-status")
-                        plan_box = gr.HTML(plan_html())
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=2, min_width=280, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Mon examen</div>")
+                                plan_date = gr.Textbox(label="Date de l'examen", placeholder="AAAA-MM-JJ", elem_id="plan-date")
+                                plan_name = gr.Textbox(label="Intitulé (facultatif)", placeholder="Ex. : Partiel de réseaux", elem_id="plan-name")
+                                plan_scope = gr.Dropdown(label="Cours concernés", choices=_plan_scope_choices(), value="all", elem_id="plan-scope")
+                                plan_minutes = gr.Slider(10, 240, value=40, step=5, label="Minutes par jour", elem_id="plan-minutes")
+                                with gr.Row(elem_classes="ak-toolbar"):
+                                    plan_btn = gr.Button("Créer mon plan", variant="primary", elem_id="plan-save")
+                                    plan_del = gr.Button("Supprimer", elem_id="plan-clear")
+                                plan_status = gr.Markdown("", elem_id="plan-status")
+                            with gr.Column(scale=3, min_width=300, elem_classes="ak-pane"):
+                                plan_box = gr.HTML(plan_html())
 
                     with gr.Tab("Historique", id="history") as tab_history:
-                        gr.Markdown("## Mon historique de révision")
-                        gr.Markdown("AKORI suit vos interactions (quiz, flashcards, colle orale, questions) pour cartographier vos lacunes conceptuelles et adapter dynamiquement le niveau d'explication des réponses générées par l'assistant.")
-                        journal_box = gr.HTML(journal_html())
-                        gr.Markdown("### Conversation du cours actif")
-                        history_box = gr.HTML(history_view(doc_selector.value))
+                        with gr.Row(elem_classes="ak-cols", equal_height=False):
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Mon journal de révision</div>")
+                                journal_box = gr.HTML(journal_html())
+                            with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
+                                gr.HTML("<div class='pane-title'>Conversation du cours actif</div>")
+                                history_box = gr.HTML(history_view(doc_selector.value))
 
 
     # ------------------------------------------------------------ vue : administration (une seule page)
@@ -7425,8 +7678,8 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
     _after_enter(su_btn.click(do_register, [su_user, su_pass, su_pass2, su_remember], ENTER_OUT))
     _after_enter(su_pass2.submit(do_register, [su_user, su_pass, su_pass2, su_remember], ENTER_OUT))
     _after_enter(nav_logout.click(do_logout, [token_in], ENTER_OUT, js=LOGOUT_JS)).then(
-        lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)), None,
-        [login_panel, register_panel, login_wrap, landing_col], queue=False)
+        lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), ""), None,
+        [login_panel, register_panel, login_wrap, landing_col, li_pass], queue=False)
     _after_enter(token_in.change(do_auto_login, [token_in], ENTER_OUT))
     token_out.change(None, token_out, None, js=TOKEN_STORE_JS)
     demo.load(None, None, token_in, js=GET_TOKEN_JS)
