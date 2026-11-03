@@ -5772,6 +5772,65 @@ html:root:root:root:root body .akori-dark-page input:-internal-autofill-selected
 .akori-dark-page input[type="checkbox"]:checked { background-color:#8b6cff!important; }
 footer, .gradio-container footer { display:none!important; }
 
+html:root:root:root:root body #login-wrap #auth-tabs-bar, html:root:root:root:root body #login-wrap #auth-tabs-bar .html-container, html:root:root:root:root body #login-wrap #auth-tabs-bar .prose { padding:0!important;margin-left:0!important;margin-right:0!important;max-width:none!important; }
+html:root:root:root:root body #login-wrap .auth-tabs { padding:0!important; }
+html:root:root:root:root body #login-wrap .auth-card .pw-eye, html:root:root:root:root body.akori-dark #login-wrap .auth-card .pw-eye { background:transparent!important;border:0!important;box-shadow:none!important;color:#a6a39b!important;right:.6rem!important; }
+html:root:root:root:root body #login-wrap .auth-card .pw-eye:hover { background:rgba(250,249,245,.08)!important;color:#faf9f5!important; }
+
+html:root:root:root:root body #login-wrap { gap:.9rem!important; }
+html:root:root:root:root body #login-wrap #auth-tabs-bar { margin-bottom:calc(-.9rem - 1px)!important; }
+html:root:root:root:root body .gradio-container .auth-tabs button.auth-tab.auth-tab, html:root:root:root:root body.akori-dark .gradio-container .auth-tabs button.auth-tab.auth-tab { background:transparent!important;border:1px solid transparent!important;border-bottom:0!important;
+  color:#a6a39b!important;-webkit-text-fill-color:#a6a39b!important;box-shadow:none!important;min-height:0!important;border-radius:1rem 1rem 0 0!important;padding:.7rem 1.2rem .8rem!important;width:auto!important; }
+html:root:root:root:root body .gradio-container .auth-tabs button.auth-tab.auth-tab:hover, html:root:root:root:root body.akori-dark .gradio-container .auth-tabs button.auth-tab.auth-tab:hover { color:#faf9f5!important;-webkit-text-fill-color:#faf9f5!important;background:rgba(250,249,245,.04)!important; }
+html:root:root:root:root body .gradio-container .auth-tabs button.auth-tab.auth-tab.on, html:root:root:root:root body.akori-dark .gradio-container .auth-tabs button.auth-tab.auth-tab.on { background:#262624!important;border-color:#3d3d3a!important;color:#faf9f5!important;-webkit-text-fill-color:#faf9f5!important; }
+html:root:root:root:root body #login-wrap .auth-card .pw-eye { bottom:calc(10px + (2.85rem - 30px) / 2)!important;top:auto!important; }
+html:root:root:root:root body.auth-register #register-panel.auth-card { border-top-left-radius:24px!important; }
+
+/* ===== Connexion : onglets posés sur la carte, champs homogènes, sans artefacts ===== */
+html:root:root:root:root body #auth-tabs-bar { margin:0 0 -1px!important;padding:0!important;position:relative;z-index:3; }
+.auth-tabs { display:flex;gap:.35rem;padding:0 .2rem; }
+.auth-tab { position:relative;flex:0 1 auto;padding:.7rem 1.2rem .75rem;border:1px solid transparent;border-bottom:0;border-radius:1rem 1rem 0 0;
+  background:transparent;color:#a6a39b;font:inherit;font-size:.95rem;font-weight:700;cursor:pointer;transition:color .15s,background .15s; }
+.auth-tab:hover { color:#faf9f5; }
+.auth-tab.on { background:#262624;border-color:#3d3d3a;color:#faf9f5;animation:aktabin .3s cubic-bezier(.2,.8,.2,1) both; }
+.auth-tab.on::after { content:"";position:absolute;bottom:-1px;right:-1rem;width:1rem;height:1rem;pointer-events:none;
+  background:radial-gradient(circle at 100% 0, transparent calc(1rem - .5px), #3d3d3a calc(1rem - .5px), #3d3d3a 1rem, #262624 calc(1rem + .5px)); }
+.auth-tab.on:not(:first-child)::before { content:"";position:absolute;bottom:-1px;left:-1rem;width:1rem;height:1rem;pointer-events:none;
+  background:radial-gradient(circle at 0 0, transparent calc(1rem - .5px), #3d3d3a calc(1rem - .5px), #3d3d3a 1rem, #262624 calc(1rem + .5px)); }
+html:root:root:root:root body .auth-card { position:relative;z-index:2; }
+html:root:root:root:root body.auth-login #login-panel.auth-card { border-top-left-radius:0!important; }
+/* les onglets remplacent « OU / Créer un compte » et le titre de la carte d'inscription */
+html:root:root:root:root body #login-wrap .auth-or, html:root:root:root:root body #login-wrap .auth-alt, html:root:root:root:root body #login-wrap .auth-card-title { display:none!important; }
+/* champs : même fond partout, plus de coins colorés autour des blocs */
+html:root:root:root:root body .auth-card .block, html:root:root:root:root body .auth-card .form, html:root:root:root:root body .auth-card .wrap, html:root:root:root:root body .auth-card label, html:root:root:root:root body .auth-card .input-container,
+html:root:root:root:root body .auth-card .container, html:root:root:root:root body .auth-card fieldset { background:transparent!important;border-color:transparent!important;box-shadow:none!important; }
+html:root:root:root:root body.akori-dark .auth-card input[type="text"], html:root:root:root:root body.akori-dark .auth-card input[type="password"], html:root:root:root:root body.akori-dark .auth-card input[type="email"], html:root:root:root:root body.akori-dark .auth-card textarea,
+html:root:root:root:root body .auth-card input[type="text"], html:root:root:root:root body .auth-card input[type="password"], html:root:root:root:root body .auth-card textarea {
+  background:#30302e!important;border:1px solid #4a4945!important;border-radius:.8rem!important;color:#faf9f5!important;-webkit-text-fill-color:#faf9f5!important;
+  min-height:2.85rem!important;padding:.7rem 2.8rem .7rem .9rem!important;transition:border-color .15s,box-shadow .15s!important; }
+html:root:root:root:root body .auth-card input:focus, html:root:root:root:root body .auth-card textarea:focus { border-color:#8a877f!important;box-shadow:0 0 0 3px rgba(250,249,245,.08)!important;outline:none!important; }
+/* remplissage automatique du navigateur : mêmes couleurs que le champ */
+html:root:root:root:root body .auth-card input:-webkit-autofill, html:root:root:root:root body .auth-card input:-webkit-autofill:hover, html:root:root:root:root body .auth-card input:-webkit-autofill:focus,
+html:root:root:root:root body .auth-card textarea:-webkit-autofill, html:root:root:root:root body .auth-card input:autofill {
+  -webkit-box-shadow:0 0 0 1000px #30302e inset!important;box-shadow:0 0 0 1000px #30302e inset!important;-webkit-text-fill-color:#faf9f5!important;
+  caret-color:#faf9f5!important;border:1px solid #4a4945!important;transition:background-color 99999s ease-out 0s!important; }
+html:root:root:root:root body .auth-card .pw-eye { background:transparent!important;color:#a6a39b!important;border:0!important;box-shadow:none!important;right:.7rem!important;bottom:.5rem!important; }
+html:root:root:root:root body .auth-card .pw-eye:hover { color:#faf9f5!important;background:rgba(250,249,245,.08)!important; }
+html:root:root:root:root body #login-wrap .link-btn, html:root:root:root:root body #login-wrap .link-btn.gr-button { background:transparent!important;border:0!important;box-shadow:none!important;color:#a6a39b!important;-webkit-text-fill-color:#a6a39b!important;min-height:0!important;padding:.25rem .5rem!important; }
+html:root:root:root:root body #login-wrap .link-btn:hover { color:#faf9f5!important;-webkit-text-fill-color:#faf9f5!important;text-decoration:underline; }
+/* plus d'indicateur de chargement Gradio sous le bouton : le bouton affiche lui-même l'attente */
+html:root:root:root:root body #login-wrap [data-testid="status-tracker"], html:root:root:root:root body #login-wrap .wrap.default, html:root:root:root:root body #login-wrap .wrap.translucent, html:root:root:root:root body #login-wrap .eta-bar, html:root:root:root:root body #login-wrap .progress-text { display:none!important; }
+html:root:root:root:root body #login-wrap .auth-status, html:root:root:root:root body #login-wrap .auth-status p { min-height:0!important; }
+html:root:root:root:root body #login-wrap .auth-status:empty, html:root:root:root:root body #login-wrap .auth-status:has(.prose:empty) { display:none!important; }
+html:root:root:root:root body #li-btn, html:root:root:root:root body #su-btn { position:relative;overflow:hidden;transition:background .15s,transform .1s!important; }
+html:root:root:root:root body #li-btn:active, html:root:root:root:root body #su-btn:active { transform:scale(.985); }
+html:root:root:root:root body #li-btn.busy, html:root:root:root:root body #su-btn.busy { color:transparent!important;-webkit-text-fill-color:transparent!important;pointer-events:none; }
+html:root:root:root:root body #li-btn.busy::after, html:root:root:root:root body #su-btn.busy::after { content:"";position:absolute;left:50%;top:50%;width:1.2rem;height:1.2rem;margin:-.6rem 0 0 -.6rem;border-radius:50%;
+  border:2px solid rgba(31,30,29,.25);border-top-color:#1f1e1d;animation:akspinb .7s linear infinite; }
+@keyframes akspinb { to { transform:rotate(360deg); } }
+html:root:root:root:root body.m-mode #login-wrap { padding:0 .25rem!important; }
+html:root:root:root:root body.m-mode .auth-tab { padding:.65rem .9rem .7rem;font-size:.9rem; }
+
 /* =====================================================================================
    STABILITÉ AU ZOOM ET AU REDIMENSIONNEMENT
    - box-sizing partout, médias bornés à leur conteneur, enfants flexibles autorisés à rétrécir ;
@@ -6446,6 +6505,37 @@ AKORI_NAV_JS = r"""
     document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
     wrap.querySelector('.no').focus();
   }, true);
+  // Connexion : onglets « Se connecter / Créer un compte » posés sur la carte
+  document.addEventListener('click', (event) => {
+    const tab = event.target.closest && event.target.closest('.auth-tab');
+    if (!tab) return;
+    const target = document.getElementById(tab.dataset.tab === 'register' ? 'go-register' : 'go-login');
+    if (target) target.click();
+  });
+  // Bouton « Continuer » : indicateur d'attente dans le bouton, jusqu'à la réponse
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest && event.target.closest('#li-btn, #su-btn');
+    if (!btn) return;
+    btn.classList.add('busy');
+    window.setTimeout(() => btn.classList.remove('busy'), 12000);
+  });
+  const authWatch = () => {
+    const reg = document.getElementById('register-panel');
+    const regOn = !!(reg && reg.offsetParent !== null);
+    document.body.classList.toggle('auth-login', !regOn);
+    document.querySelectorAll('.auth-tab').forEach((t) => t.classList.toggle('on', (t.dataset.tab === 'register') === regOn));
+    ['login-status', 'register-status'].forEach((id) => {
+      const st = document.getElementById(id);
+      const msg = st && ((st.querySelector('.prose, .md') || {}).textContent || '').trim();
+      if (st && st.__akTxt !== msg) { const had = st.__akTxt !== undefined; st.__akTxt = msg; if (had && msg) document.querySelectorAll('#li-btn, #su-btn').forEach((b) => b.classList.remove('busy')); }
+    });
+    if (!document.getElementById('login-wrap') || document.getElementById('login-wrap').offsetParent === null) document.querySelectorAll('#li-btn, #su-btn').forEach((b) => b.classList.remove('busy'));
+    // Téléphone : le bouton d'import ouvre le gestionnaire de fichiers (PDF) et non la galerie
+    document.querySelectorAll('#add-document-tile input[type=file], #add-document-tile ~ input[type=file], input[type=file][accept*=".pdf"]').forEach((inp) => {
+      if (inp.accept !== 'application/pdf,.pdf') inp.accept = 'application/pdf,.pdf';
+    });
+  };
+  window.setInterval(authWatch, 250);
   // Comptes récents sur l'écran de connexion (comme Messenger)
   const ACC_KEY = 'akori-accounts';
   const accLoad = () => { try { return JSON.parse(localStorage.getItem(ACC_KEY) || '[]'); } catch (e) { return []; } };
@@ -7365,9 +7455,11 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
             back_land = gr.Button("Découvrir AKORI", elem_id="back-land", elem_classes="link-btn", scale=0, min_width=150)
         gr.HTML("<div class='auth-hero'><h1>Vos cours,<br>votre réussite</h1>"
                 "<p>Un assistant de révision qui ne répond qu'avec vos propres documents.</p></div>")
+        gr.HTML("<div class='auth-tabs' role='tablist'><button type='button' class='auth-tab on' data-tab='login'>Se connecter</button>"
+                "<button type='button' class='auth-tab' data-tab='register'>Créer un compte</button></div>", elem_id="auth-tabs-bar")
         with gr.Column(visible=True, elem_id="login-panel", elem_classes="auth-panel auth-card") as login_panel:
             gr.HTML("<div id='ak-accounts'></div>")
-            li_user = gr.Textbox(label="E-mail", placeholder="Entrez votre adresse e-mail", elem_id="li-user")
+            li_user = gr.Textbox(label="E-mail", placeholder="Votre e-mail", elem_id="li-user")
             li_pass = gr.Textbox(label="Mot de passe", type="password", placeholder="Votre mot de passe", elem_id="li-pass")
             li_remember = gr.State(True)
             li_btn = gr.Button("Continuer", elem_id="li-btn")
