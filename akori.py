@@ -3413,27 +3413,52 @@ ORAL_MIC_JS = r"""
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!area || !btn) return;
   if (!SR) { if (window.__akBanner) window.__akBanner(window.__akoriLang === 'en' ? 'Voice dictation is not supported by this browser (use Chrome).' : "La dictée vocale n'est pas disponible sur ce navigateur (utilisez Chrome)."); return; }
-  if (window.__akRec) { window.__akRec.stop(); return; }
+  if (window.__akRec) { window.__akRecStop = true; window.__akRec.stop(); return; }
   const setValue = (v) => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(area, v);
     area.dispatchEvent(new Event('input', { bubbles: true }));
   };
-  const rec = new SR();
-  rec.lang = window.__akoriLang === 'en' ? 'en-US' : 'fr-FR';
-  rec.continuous = true; rec.interimResults = true;
-  const base = area.value ? area.value.replace(/\s+$/, '') + ' ' : '';
-  let finalText = '';
-  rec.onresult = (e) => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalText += t + ' '; else interim += t;
-    }
-    setValue(base + finalText + interim);
+  // Sur téléphone (Chrome Android), le mode continu renvoie des résultats cumulés et répétés
+  // (« Cali sur Cali sur le… ») : on dicte phrase par phrase et on relance la reconnaissance.
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  let base = clean(area.value);
+  let empty = 0;
+  window.__akRecStop = false;
+  const finish = () => { window.__akRec = null; btn.classList.remove('rec-on'); };
+  const start = () => {
+    const rec = new SR();
+    rec.lang = window.__akoriLang === 'en' ? 'en-US' : 'fr-FR';
+    rec.continuous = !mobile;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    let heard = '';
+    rec.onresult = (e) => {
+      let fin = '', interim = '';
+      if (mobile) {
+        const last = e.results[e.results.length - 1];      // la dernière hypothèse contient déjà toute la phrase
+        if (last.isFinal) fin = clean(last[0].transcript); else interim = clean(last[0].transcript);
+      } else {
+        for (let i = 0; i < e.results.length; i++) {
+          const t = clean(e.results[i][0].transcript);
+          if (e.results[i].isFinal) fin += (fin ? ' ' : '') + t; else interim += (interim ? ' ' : '') + t;
+        }
+      }
+      heard = fin || interim || heard;
+      setValue(clean(base + ' ' + (fin + ' ' + interim)));
+    };
+    rec.onerror = (e) => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') window.__akRecStop = true; };
+    rec.onend = () => {
+      if (heard) { base = clean(base + ' ' + heard); empty = 0; } else { empty += 1; }
+      setValue(base);
+      if (mobile && !window.__akRecStop && empty < 2) { try { start(); return; } catch (err) {} }
+      finish();
+    };
+    window.__akRec = rec;
+    btn.classList.add('rec-on');
+    rec.start();
   };
-  rec.onend = () => { window.__akRec = null; btn.classList.remove('rec-on'); };
-  rec.onerror = () => { window.__akRec = null; btn.classList.remove('rec-on'); };
-  window.__akRec = rec; btn.classList.add('rec-on'); rec.start();
+  start();
 }
 """
 
