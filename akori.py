@@ -421,6 +421,76 @@ def _resolve_data_dir():
 
 DATA_DIR, STORAGE_ON_DRIVE = _resolve_data_dir()
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def _writable(path):
+  try:
+    probe = os.path.join(path, f".akori_write_test_{os.getpid()}")
+    with open(probe, "w") as f:
+      f.write("ok")
+    os.remove(probe)
+    return True
+  except OSError:
+    return False
+
+
+if not _writable(DATA_DIR):
+  # Disque monté en lecture seule ou sans droits (ex. /data mal configuré) : sans ce repli, ni comptes ni PDF ne s'enregistrent.
+  print(f"⚠️ Impossible d'écrire dans {DATA_DIR} : repli sur {LOCAL_DATA_DIR} (données temporaires).")
+  DATA_DIR, STORAGE_ON_DRIVE = LOCAL_DATA_DIR, False
+  os.makedirs(DATA_DIR, exist_ok=True)
+STORAGE_KIND = ("Google Drive" if "/drive/" in DATA_DIR.replace("\\", "/").lower()
+                else ("Disque persistant" if STORAGE_ON_DRIVE or DATA_DIR.rstrip("/") == "/data" else "Temporaire"))
+
+# ---- Sauvegarde dans un dépôt Hugging Face (facultatif) : les comptes et les cours survivent aux redémarrages du Space,
+# même sans « Persistent storage » payant. Activer avec les secrets AKORI_HF_DATASET=<compte>/akori-data et HF_TOKEN (écriture).
+HF_DATASET = (os.getenv("AKORI_HF_DATASET") or "").strip()
+HF_TOKEN = (os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN") or "").strip()
+HF_SYNC = bool(HF_DATASET and HF_TOKEN)
+_HF_DIRTY = threading.Event()
+_HF_STATE = {"last": "", "error": ""}
+
+
+def _hf_restore():
+  """Au démarrage : si le dossier de données est vide (Space redémarré), on récupère la dernière sauvegarde."""
+  if not HF_SYNC:
+    return
+  try:
+    from huggingface_hub import HfApi, snapshot_download
+    api = HfApi(token=HF_TOKEN)
+    api.create_repo(HF_DATASET, repo_type="dataset", private=True, exist_ok=True)
+    if os.path.exists(os.path.join(DATA_DIR, "users.json")):
+      return
+    snapshot_download(repo_id=HF_DATASET, repo_type="dataset", local_dir=DATA_DIR, token=HF_TOKEN)
+    print(f"✅ Données AKORI restaurées depuis le dépôt Hugging Face {HF_DATASET}.")
+  except Exception as e:
+    _HF_STATE["error"] = f"{type(e).__name__}: {e}"[:200]
+    print(f"⚠️ Restauration depuis {HF_DATASET} impossible : {e}")
+
+
+def _hf_sync_loop():
+  """Envoie les changements (comptes, cours, progression) vers le dépôt, au plus toutes les 30 s."""
+  from huggingface_hub import HfApi
+  api = HfApi(token=HF_TOKEN)
+  while True:
+    _HF_DIRTY.wait()
+    time.sleep(30)
+    _HF_DIRTY.clear()
+    try:
+      api.upload_folder(folder_path=DATA_DIR, repo_id=HF_DATASET, repo_type="dataset", commit_message="AKORI : sauvegarde automatique",
+                        ignore_patterns=["*.tmp", ".akori_write_test_*", "LISEZ-MOI.txt", "**/__pycache__/**"])
+      _HF_STATE["last"], _HF_STATE["error"] = datetime.now().isoformat(timespec="seconds"), ""
+    except Exception as e:
+      _HF_STATE["error"] = f"{type(e).__name__}: {e}"[:200]
+      print(f"⚠️ Sauvegarde vers {HF_DATASET} impossible : {e}")
+      _HF_DIRTY.set()
+      time.sleep(120)
+
+
+_hf_restore()
+if HF_SYNC:
+  threading.Thread(target=_hf_sync_loop, name="akori-hf-sync", daemon=True).start()
+  STORAGE_KIND = f"Hugging Face ({HF_DATASET})"
 try:
   _readme = os.path.join(DATA_DIR, "LISEZ-MOI.txt")
   if not os.path.exists(_readme):
@@ -465,6 +535,8 @@ def _write_json(path, data):
   with open(tmp, "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
   os.replace(tmp, path)
+  if HF_SYNC:
+    _HF_DIRTY.set()
 
 
 def _log(event, user=None, detail="", **measures):
@@ -1714,8 +1786,12 @@ def indexer_pdf_stream(file_path):
       yield ("done", filename, f"✅ '{filename}' indexé avec succès ({total} fragments, OCR sur {ocr_pages} pages).")
     else:
       yield ("done", filename, f"✅ '{filename}' indexé avec succès ({total} fragments).")
-  except PermissionError:
-    yield ("done", None, "⚠️ Session expirée : rechargez la page pour vous reconnecter.")
+  except PermissionError as e:
+    if not _CUR_USER.get():
+      yield ("done", None, "⚠️ Session expirée : rechargez la page pour vous reconnecter.")
+    else:
+      _log("upload_error", detail=f"{filename} · {e}")
+      yield ("done", None, f"❌ Écriture impossible dans le dossier de données ({DATA_DIR}) : {e}")
   except Exception as e:
     _log("upload_error", detail=f"{filename} · {e}")
     yield ("done", None, f"❌ Erreur lors de l'indexation : {str(e)}")
@@ -6974,6 +7050,15 @@ AKORI_NAV_JS = r"""
   };
   document.addEventListener('click', (e) => { const h = e.target.closest && e.target.closest('.gp-open'); if (h) gpOpen(h); });
   document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.gp-open')) { e.preventDefault(); gpOpen(e.target); } });
+  // Session perdue (serveur redémarré, page restée ouverte) : on recharge une fois pour se reconnecter automatiquement
+  window.setInterval(() => {
+    const txt = [...document.querySelectorAll('#upload-status, #plan-status, #login-status, .ak-status, [id$="-status"]')].map((e) => e.textContent || '').join(' ');
+    if (!/Session expirée|Session expired/.test(txt)) return;
+    let last = 0; try { last = +(sessionStorage.getItem('akori-reloaded') || 0); } catch (e) {}
+    if (Date.now() - last < 60000) return;
+    try { sessionStorage.setItem('akori-reloaded', String(Date.now())); } catch (e) {}
+    window.setTimeout(() => location.reload(), 1500);
+  }, 700);
   // Plan de révision intelligent : cartes cliquables (détails, lancer, calendrier, temps, modifier)
   document.addEventListener('click', (e) => {
     const t = e.target.closest ? e.target : null;
@@ -7628,7 +7713,8 @@ def _admin_overview():
         f"<div><span>Modèles de secours</span><b>{_escape_html(', '.join(_models_chain()[1:]) or '—')}</b></div>"
         f"<div><span>Clé API Gemini</span><b>{'✅ configurée' if GEMINI_API_KEY else ('❌ invalide (caractères non autorisés)' if not GEMINI_KEY_OK else '❌ manquante (GEMINI_API_KEY)')}</b></div>"
         f"<div><span>Disponibilité</span><b>{_fmt_duration(time.time() - APP_STARTED_AT)}</b></div>"
-        f"<div><span>Stockage</span><b>{'✅ Google Drive' if STORAGE_ON_DRIVE else '⚠️ Temporaire (non sauvegardé)'}</b></div>"
+        f"<div><span>Stockage</span><b>{('⚠️ Temporaire : comptes et cours effacés à chaque redémarrage' if STORAGE_KIND == 'Temporaire' else '✅ ' + _escape_html(STORAGE_KIND))}</b></div>"
+        + (f"<div><span>Dernière sauvegarde</span><b>{_escape_html(_HF_STATE['last'] or 'en attente')}{(' · ⚠️ ' + _escape_html(_HF_STATE['error'])) if _HF_STATE['error'] else ''}</b></div>" if HF_SYNC else "") +
         f"<div><span>Dossier de données</span><b>{_escape_html(DATA_DIR)}</b></div>"
         f"<div><span>Taille PDF maximale</span><b>{int(MAX_PDF_MB)} Mo</b></div>"
         f"<div><span>Modèle d'embeddings</span><b>{_escape_html(EMBED_MODEL_NAME)} ({EMBED_DEVICE})</b></div>"
@@ -8328,6 +8414,9 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
         if not isinstance(files, (list, tuple)):
             files = [files] if files else []
         title = (title or "").strip()
+        if not _CUR_USER.get():   # serveur redémarré alors que la page était ouverte : on recharge pour se reconnecter
+            yield ("⚠️ Session expirée : rechargez la page pour vous reconnecter.",) + tuple([gr.update()] * (10 + REVISION_N))
+            return
         total, done, errors = len(files), [], []
         if not total:
             yield ("⚠️ Aucun fichier reçu. Réessayez avec un fichier PDF.",) + tuple([gr.update()] * (10 + REVISION_N))

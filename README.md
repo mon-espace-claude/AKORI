@@ -28,6 +28,8 @@ Assistant de révision à partir de vos PDF : assistant qui cite ses sources (RA
    - `GEMINI_API_KEY` : votre clé Gemini (commence par `AIza`) ; facultatif : `GEMINI_API_KEYS` (plusieurs clés séparées par des virgules) pour répartir la charge ;
    - `AKORI_ADMIN_PASSWORD` : mot de passe du compte `admin` (sinon un mot de passe aléatoire est écrit dans les *logs* au premier démarrage).
 4. **Données persistantes** : sans disque, tout est effacé à chaque redémarrage du Space. Dans **Settings → Persistent storage**, activer un stockage (payant) : il est monté sur `/data`, AKORI l'utilise automatiquement.
+   - **Gratuit** : créer un *token* Hugging Face avec le droit **Write** (Settings → Access Tokens), puis ajouter les secrets `HF_TOKEN` (ce token) et `AKORI_HF_DATASET` (par ex. `votre-compte/akori-data`). AKORI crée ce dépôt privé, y sauvegarde comptes, cours et progression (toutes les 30 s après un changement) et les restaure à chaque redémarrage du Space.
+   - Vérification : console d'administration → *Maintenance* → ligne **Stockage** (« Temporaire » = les comptes seront effacés au prochain redémarrage).
 5. Le Space fournit une adresse `https://<compte>-akori.hf.space` à partager : elle s'ouvre sur n'importe quel téléphone, sans installation. Sur le téléphone, « Ajouter à l'écran d'accueil » crée une icône AKORI.
 
 Variables utiles : `AKORI_SHARE=1` (lien Gradio public hors Colab), `AKORI_EMAIL_CHECK=0` (ne pas vérifier le domaine des e-mails), `AKORI_OCR=tesseract|gemini|off`, `AKORI_EDITOR=<nom affiché dans À propos>`.
