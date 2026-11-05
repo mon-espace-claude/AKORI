@@ -1108,7 +1108,72 @@ def global_progress_html(active_doc=None):
   pct = st['percent']
   quiz_avg = f"{st['quiz_avg']}%" if st['quiz_avg'] is not None else "—"
   oral_avg = f"{st['oral_avg']:.1f}/10" if st['oral_avg'] is not None else "—"
-  return f"""<div class='global-progress-hero'><div class='global-progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div><div class='global-progress-copy'><div class='eyebrow'>VUE D'ENSEMBLE</div><h2>Progression globale</h2><p>Moyenne de la progression de tous vos cours. Chaque cours compte 3 activités (flashcards, quiz, colle orale) : une activité non commencée compte pour 0 %.</p></div></div><div class='global-metrics'><div><b>{st['courses']}</b><span>Cours importés</span><small>dans votre espace</small></div><div><b>{st['started']}</b><span>Cours commencés</span><small>au moins une activité faite</small></div><div><b>{st['known']}/{st['flashcards']}</b><span>Flashcards maîtrisées</span><small>tous cours confondus</small></div><div><b>{quiz_avg}</b><span>Moyenne des quiz</span><small>{st['quizzes']} quiz terminé(s), tous cours</small></div><div><b>{oral_avg}</b><span>Moyenne des colles</span><small>{st['orals']} colle(s), tous cours</small></div></div><div class='global-course-list'><div class='global-list-title'>Progression par cours</div>{''.join(rows)}</div><div class='global-detail-hint'>Le détail pédagogique reste lié au cours sélectionné : activités, points forts, points faibles et prochaine étape.</div>"""
+  return _progress_carousel_html() + f"""<div class='global-progress-hero gp-open' role='button' tabindex='0' title='Voir le détail par cours'><div class='global-progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div><div class='global-progress-copy'><h2>Progression globale</h2><p>Moyenne de la progression de tous vos cours. Chaque cours compte 3 activités (flashcards, quiz, colle orale) : une activité non commencée compte pour 0 %.</p><span class='gp-hint'>Voir le détail par cours →</span></div></div><div class='global-metrics'><div><b>{st['courses']}</b><span>Cours importés</span><small>dans votre espace</small></div><div><b>{st['started']}</b><span>Cours commencés</span><small>au moins une activité faite</small></div><div><b>{st['known']}/{st['flashcards']}</b><span>Flashcards maîtrisées</span><small>tous cours confondus</small></div><div><b>{quiz_avg}</b><span>Moyenne des quiz</span><small>{st['quizzes']} quiz terminé(s), tous cours</small></div><div><b>{oral_avg}</b><span>Moyenne des colles</span><small>{st['orals']} colle(s), tous cours</small></div></div><div class='global-course-list'><div class='global-list-title'>Progression par cours</div>{''.join(rows)}</div><div class='global-detail-hint'>Le détail pédagogique reste lié au cours sélectionné : activités, points forts, points faibles et prochaine étape.</div>"""
+
+
+GP_COLORS = ["#2ea383", "#e0a43a", "#4f6df5", "#e86fb0", "#8e6cf4", "#06b6d4"]
+FR_MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
+
+
+def _progress_carousel_html():
+    """Détail de la progression : une carte par cours, à faire défiler (flèches, glisser, clavier)."""
+    try:
+        sessions = _read_sessions()
+    except Exception:
+        sessions = []
+    last = {}
+    for rec in sessions:
+        d = _parse_day(rec.get("t"))
+        if d and rec.get("doc"):
+            last[rec["doc"]] = max(last.get(rec["doc"], d), d)
+    try:
+        mods = _space()["modules"]
+        plan = _space().get("plan") or {}
+    except Exception:
+        mods, plan = {}, {}
+    exam = _parse_day(plan.get("exam_date")) if plan else None
+    exam_names = set(_plan_names(plan.get("scope"))) if exam else set()
+    cards = []
+    for i, (name, data) in enumerate(documents_db.items()):
+        cs = _course_stats(name)
+        pct = cs["percent"]
+        color = GP_COLORS[i % len(GP_COLORS)]
+        day = last.get(name) or _parse_day(data.get("added_at"))
+        when = f"{day.day} {FR_MONTHS[day.month - 1]} {day.year}" if day else ""
+        title = data.get("title") or os.path.splitext(name)[0]
+        title = title if len(title) <= 46 else title[:44] + "…"
+        mod = (mods.get(data.get("module") or "") or {}).get("name") or "Sans module"
+        circ = 2 * 3.14159 * 52
+        dash = circ * pct / 100
+        val = (f"<circle cx='70' cy='70' r='52' class='gp-val' stroke='{color}' stroke-dasharray='{dash:.1f} {circ:.1f}' transform='rotate(-90 70 70)'/>"
+               if pct > 0 else "")
+        ring = (f"<svg viewBox='0 0 140 140' class='gp-ring' aria-hidden='true'><circle cx='70' cy='70' r='52' class='gp-track-c'/>{val}</svg>"
+                f"<b class='gp-pct'>{pct}%</b>")
+        bars = "".join(
+            f"<div class='gp-bar'><span>{lab}</span><div><i style='width:{v}%;background:{color}'></i></div><em>{shown}</em></div>"
+            for lab, v, shown in (
+                ("Flashcards", cs["flash_pct"], f"{cs['flash_pct']}%" if cs["flash_answered"] else "—"),
+                ("Quiz", cs["quiz_pct"], f"{cs['quiz_pct']}%" if cs["quizzes"] else "—"),
+                ("Colle orale", cs["oral_pct"], f"{cs['oral_pct']}%" if cs["orals"] else "—")))
+        dots = "".join(f"<span class='gp-dot{' on' if on else ''}' title='{lab}'>{ico}</span>" for lab, ico, on in (
+            ("Flashcards", "🎰", cs["flash_answered"] > 0), ("Quiz", "🎯", cs["quizzes"] > 0), ("Colle orale", "🎤", cs["orals"] > 0)))
+        if exam and name in exam_names and exam >= _date.today():
+            left = (exam - _date.today()).days
+            chip = "Examen aujourd'hui" if left == 0 else f"Examen dans {left} j"
+        else:
+            chip = f"{cs['started']}/3 activités"
+        cards.append(f"<article class='gp-card' style='--c:{color}'><div class='gp-glow'></div><div class='gp-date'>{when}</div>"
+                     f"<h3 title='{_escape_html(name)}'>{_escape_html(title)}</h3><div class='gp-sub'>{_escape_html(mod)}</div>"
+                     f"<div class='gp-ringwrap'>{ring}</div><div class='gp-bars'>{bars}</div>"
+                     f"<div class='gp-foot'><div class='gp-dots'>{dots}</div><span class='gp-chip'>{chip}</span></div></article>")
+    if not cards:
+        return ""
+    nav = ("<button type='button' class='gp-nav gp-prev' aria-label='Cours précédent'>‹</button>"
+           "<button type='button' class='gp-nav gp-next' aria-label='Cours suivant'>›</button>") if len(cards) > 1 else ""
+    pager = "".join(f"<i class='{'on' if i == 0 else ''}'></i>" for i in range(len(cards))) if len(cards) > 1 else ""
+    return (f"<div class='gp-modal' role='dialog' aria-modal='true' aria-label='Détail de la progression'>"
+            f"<button type='button' class='gp-close' aria-label='Fermer'>✕</button>"
+            f"<div class='gp-stage'>{''.join(cards)}</div>{nav}<div class='gp-pager'>{pager}</div></div>")
 
 
 def progress_detail_html(active_doc=None):
@@ -4738,8 +4803,8 @@ html:root:root:root:root body.akori-dark #sidebar .primary, html:root:root:root:
 html:root:root:root:root body.akori-dark .gradio-container input, html:root:root:root:root body.akori-dark .gradio-container textarea, html:root:root:root:root body.akori-dark .gradio-container select,
 html:root:root:root:root body.akori-dark #assistant-input textarea, html:root:root:root:root body.akori-dark #assistant-input input,
 html:root:root:root:root body.akori-dark #topbar .gr-dropdown, html:root:root:root:root body.akori-dark #topbar .gr-dropdown .wrap, html:root:root:root:root body.akori-dark #topbar .gr-dropdown input {
-  background:#1b2438!important;color:#e6ebf7!important;border-color:#2c3957!important; }
-html:root:root:root:root body.akori-dark .gradio-container .wrap, html:root:root:root:root body.akori-dark .gradio-container .input-container { background:#1b2438!important;border-color:#2c3957!important; }
+  background:#1b2438!important;color:#e6ebf7!important;border-color:var(--ak-field-border)!important; }
+html:root:root:root:root body.akori-dark .gradio-container .wrap, html:root:root:root:root body.akori-dark .gradio-container .input-container { background:#1b2438!important;border-color:var(--ak-field-border)!important; }
 html:root:root:root:root body.akori-dark #topbar label, html:root:root:root:root body.akori-dark #topbar .prose, html:root:root:root:root body.akori-dark #topbar h3 { color:#c9d2e6!important; }
 
 /* chat */
@@ -5932,6 +5997,71 @@ html:root:root:root:root body.ak-narrow.in-app #topbar > .form:has(#doc-select),
 html:root:root:root:root body.m-mode.in-app #topbar > .form:has(#doc-select), html:root:root:root:root body.m-mode.in-app #topbar > #doc-select { order:-1;flex:1 1 100%!important;margin:0 0 .5rem 0!important; }
 html:root:root:root:root body.m-mode.in-app #topbar > #topbar-title { flex:1 1 auto!important; }
 html:root:root:root:root body.m-mode.in-app #topbar > #topbar-title::after { display:none; }
+/* ===== Progression : vue d'ensemble cliquable + détail par cours en carrousel ===== */
+.gp-open { cursor:pointer;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
+.gp-open:hover, .gp-open:focus-visible { transform:translateY(-3px);box-shadow:0 18px 40px rgba(0,0,0,.25);outline:none; }
+.gp-hint { display:inline-flex;margin-top:.5rem;font-size:.8rem;font-weight:700;color:var(--ak-text);opacity:.75; }
+.gp-open:hover .gp-hint { opacity:1; }
+#app-view .gp-modal { display:none; }
+body > .gp-modal { position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:radial-gradient(40rem circle at 30% 20%, rgba(46,163,131,.22), transparent 60%), radial-gradient(36rem circle at 75% 30%, rgba(224,164,58,.18), transparent 60%), rgba(12,14,20,.82);
+  backdrop-filter:blur(10px);animation:akfade .2s ease both; }
+body > .gp-modal .gp-stage { position:relative;width:min(22rem,78vw);height:min(36rem,82vh); }
+body > .gp-modal .gp-card { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding:1.4rem 1.4rem 0;border-radius:2rem;
+  background:#1b1c22;border:1px solid rgba(255,255,255,.08);box-shadow:0 30px 70px rgba(0,0,0,.45);color:#f2f3f7;overflow:hidden;
+  transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease,filter .45s ease;opacity:0;pointer-events:none;transform:scale(.7); }
+body > .gp-modal .gp-card.pos0 { opacity:1;transform:none;pointer-events:auto;z-index:3; }
+body > .gp-modal .gp-card.posL { opacity:.55;transform:translateX(-78%) scale(.84);filter:blur(3px);z-index:2; }
+body > .gp-modal .gp-card.posR { opacity:.55;transform:translateX(78%) scale(.84);filter:blur(3px);z-index:2; }
+.gp-glow { position:absolute;inset:-30% -20% auto;height:70%;background:radial-gradient(closest-side, var(--c), transparent);opacity:.35;pointer-events:none; }
+.gp-date { position:relative;align-self:flex-start;font-size:.9rem;color:#c9cbd4; }
+body > .gp-modal .gp-card h3 { position:relative;margin:1rem 0 .2rem;font-size:clamp(1.2rem,4vw,1.55rem);font-weight:800;text-align:center;color:#fff; }
+.gp-sub { position:relative;font-size:.9rem;font-weight:600;color:#b9bcc8; }
+.gp-ringwrap { position:relative;width:min(11rem,52vw);aspect-ratio:1;margin:1rem 0 .6rem;display:flex;align-items:center;justify-content:center; }
+.gp-ring { position:absolute;inset:0;width:100%;height:100%; }
+.gp-ring circle { fill:none;stroke-width:14; } .gp-track-c { stroke:#26304a; }
+.gp-val { stroke-linecap:round;transition:stroke-dasharray .8s ease; }
+.gp-pct { position:relative;font-size:clamp(1.8rem,7vw,2.4rem);font-weight:800;color:#fff; }
+.gp-bars { position:relative;width:100%;display:grid;gap:.45rem;margin-bottom:auto; }
+.gp-bar { display:grid;grid-template-columns:5.5rem 1fr 2.6rem;align-items:center;gap:.5rem;font-size:.78rem;color:#c9cbd4; }
+.gp-bar > div { height:.4rem;border-radius:99px;background:#2a2c36;overflow:hidden; } .gp-bar i { display:block;height:100%;border-radius:99px; }
+.gp-bar em { font-style:normal;text-align:right;color:#fff;font-weight:700; }
+body > .gp-modal .gp-card .gp-foot { position:relative;width:calc(100% + 2.8rem);margin-top:1rem;padding:.9rem 1.4rem;border-top:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:space-between;gap:.5rem; }
+.gp-dots { display:flex; } .gp-dot { width:1.9rem;height:1.9rem;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-left:-.35rem;
+  background:#2a2c36;border:2px solid #1b1c22;color:#7d8090;font-size:.8rem; } .gp-dot:first-child { margin-left:0; }
+.gp-dot.on { background:var(--c);color:#fff; } .gp-dot .ak-ico svg { width:.9rem;height:.9rem; }
+.gp-chip { padding:.35rem .9rem;border-radius:99px;background:#2a2c36;color:#e6e7ec;font-size:.8rem;font-weight:600;white-space:nowrap; }
+body > .gp-modal .gp-nav { position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:3.6rem;height:3.6rem;border-radius:50%;border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.16);backdrop-filter:blur(8px);color:#fff;font-size:2rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s; }
+body > .gp-modal .gp-nav:hover { background:rgba(255,255,255,.28); }
+body > .gp-modal .gp-prev { left:max(1rem, calc(50% - min(22rem,78vw)/2 - 4.6rem)); }
+body > .gp-modal .gp-next { right:max(1rem, calc(50% - min(22rem,78vw)/2 - 4.6rem)); }
+body > .gp-modal .gp-close { position:absolute;top:1rem;right:1rem;z-index:6;width:2.6rem;height:2.6rem;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:1rem;cursor:pointer; }
+.gp-pager { position:absolute;bottom:max(1rem,3vh);left:50%;transform:translateX(-50%);display:flex;gap:.4rem;z-index:5; }
+.gp-pager i { width:.5rem;height:.5rem;border-radius:99px;background:rgba(255,255,255,.3);transition:width .2s,background .2s; } .gp-pager i.on { width:1.4rem;background:#fff; }
+
+/* ===== Champs de texte : bords neutres (plus de bleu) ===== */
+html:root:root:root:root body input[type="text"], html:root:root:root:root body input[type="password"], html:root:root:root:root body input[type="email"], html:root:root:root:root body input[type="number"], html:root:root:root:root body input[type="date"], html:root:root:root:root body textarea, html:root:root:root:root body select,
+html:root:root:root:root body.akori-dark input[type="text"], html:root:root:root:root body.akori-dark input[type="password"], html:root:root:root:root body.akori-dark input[type="number"], html:root:root:root:root body.akori-dark textarea { border-color:var(--ak-field-border)!important; }
+html:root:root:root:root body input:focus, html:root:root:root:root body textarea:focus, html:root:root:root:root body select:focus, html:root:root:root:root body.akori-dark input:focus, html:root:root:root:root body.akori-dark textarea:focus {
+  border-color:color-mix(in srgb, var(--ak-text) 35%, transparent)!important;box-shadow:0 0 0 3px color-mix(in srgb, var(--ak-text) 8%, transparent)!important;outline:none!important; }
+html:root:root:root:root body .block:focus-within, html:root:root:root:root body .wrap:focus-within, html:root:root:root:root body .input-container:focus-within, html:root:root:root:root body label:focus-within { box-shadow:none!important;border-color:transparent!important; }
+html:root:root:root:root body #login-wrap .auth-card input, html:root:root:root:root body #login-wrap .auth-card textarea { border-color:#4a4945!important; }
+html:root:root:root:root body #login-wrap .auth-card input:focus, html:root:root:root:root body #login-wrap .auth-card textarea:focus { border-color:#8a877f!important;box-shadow:0 0 0 3px rgba(250,249,245,.08)!important; }
+html:root:root:root:root body .ak-datepick { border-color:var(--ak-line)!important; }
+
+/* ===== Bleu réservé aux labels (ex. « Cours actif ») : titres, sur-titres et chiffres en couleurs neutres ===== */
+html:root:root:root:root body .pane-title, html:root:root:root:root body .eyebrow, html:root:root:root:root body.akori-dark .eyebrow, html:root:root:root:root body .card-label, html:root:root:root:root body.akori-dark .card-label, html:root:root:root:root body .oral-tag, html:root:root:root:root body .sem-title,
+html:root:root:root:root body .quiz-result-kicker, html:root:root:root:root body.akori-dark .quiz-result-kicker, html:root:root:root:root body .global-list-title { color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important; }
+html:root:root:root:root body .plan-kpis b, html:root:root:root:root body .jr-kpis b, html:root:root:root:root body .mini-stat b, html:root:root:root:root body .stat-row .mini-stat:hover b { color:var(--ak-text)!important; }
+html:root:root:root:root body .hx-ico, html:root:root:root:root body .jr-ico { color:var(--ak-text)!important; }
+
+:root { --ak-field-border:#d9dde5; }
+html:root:root:root:root body.akori-dark { --ak-field-border:#363a44; }
+html:root:root:root:root body .ak-datepick { border-color:var(--ak-field-border)!important; }
+html:root:root:root:root body.akori-dark #login-wrap .auth-card .input-container, html:root:root:root:root body.akori-dark #login-wrap .auth-card .wrap, html:root:root:root:root body #login-wrap .auth-card .input-container { background:transparent!important;border-color:transparent!important;box-shadow:none!important; }
+
 """
 
 
@@ -6561,6 +6691,43 @@ AKORI_NAV_JS = r"""
     });
   };
   window.setInterval(authWatch, 250);
+  // Progression : la vue d'ensemble ouvre le détail par cours (carrousel)
+  const gpOpen = (src) => {
+    const tpl = src.closest('.ak-pane, .tabitem, body').querySelector('.gp-modal');
+    if (!tpl) return;
+    const old = document.querySelector('body > .gp-modal'); if (old) old.remove();
+    const modal = tpl.cloneNode(true); document.body.appendChild(modal);
+    const cards = [...modal.querySelectorAll('.gp-card')];
+    const pager = [...modal.querySelectorAll('.gp-pager i')];
+    let cur = 0;
+    const show = () => {
+      const n = cards.length;
+      cards.forEach((c, i) => {
+        c.classList.remove('pos0', 'posL', 'posR');
+        if (i === cur) c.classList.add('pos0');
+        else if (n > 1 && i === (cur - 1 + n) % n) c.classList.add('posL');
+        else if (n > 2 && i === (cur + 1) % n) c.classList.add('posR');
+        else if (n === 2 && i !== cur) c.classList.add('posR');
+      });
+      pager.forEach((p, i) => p.classList.toggle('on', i === cur));
+    };
+    const go = (d) => { cur = (cur + d + cards.length) % cards.length; show(); };
+    const close = () => { modal.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); };
+    document.addEventListener('keydown', onKey);
+    modal.addEventListener('click', (e) => {
+      if (e.target.closest('.gp-close') || e.target === modal) return close();
+      if (e.target.closest('.gp-prev') || e.target.closest('.gp-card.posL')) return go(-1);
+      if (e.target.closest('.gp-next') || e.target.closest('.gp-card.posR')) return go(1);
+    });
+    let sx = null;
+    modal.addEventListener('pointerdown', (e) => { sx = e.clientX; });
+    modal.addEventListener('pointerup', (e) => { if (sx === null) return; const dx = e.clientX - sx; sx = null; if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1); });
+    show();
+    const closeBtn = modal.querySelector('.gp-close'); if (closeBtn) closeBtn.focus();
+  };
+  document.addEventListener('click', (e) => { const h = e.target.closest && e.target.closest('.gp-open'); if (h) gpOpen(h); });
+  document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.gp-open')) { e.preventDefault(); gpOpen(e.target); } });
   // Comptes récents sur l'écran de connexion (comme Messenger)
   const ACC_KEY = 'akori-accounts';
   const accLoad = () => { try { return JSON.parse(localStorage.getItem(ACC_KEY) || '[]'); } catch (e) { return []; } };
