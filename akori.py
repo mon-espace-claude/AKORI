@@ -1099,19 +1099,15 @@ def _oral_caption(st):
 def global_progress_html(active_doc=None):
   if not documents_db:
     return """<div class='progress-empty'><b>Votre progression commencera ici.</b><br>Importez un cours pour créer votre premier suivi. Tant qu'aucun cours n'est chargé, la progression reste à 0 %.</div>"""
-  st = _global_progress_stats(); rows = []
-  for name, data in documents_db.items():
-    cs = _course_stats(name); cp = cs["percent"]; active = " active-progress-course" if name == active_doc else ""
-    detail = (f"Flashcards {_pct_or_dash(cs['flash_pct'], cs['flash_total'])} · Quiz {_pct_or_dash(cs['quiz_pct'], cs['quizzes'])}"
-              f" · Colle {_pct_or_dash(cs['oral_pct'], cs['orals'])}")
-    rows.append(f"<div class='global-course-row{active}'><div class='global-course-main'><span class='global-course-dot'></span><div><b>{_escape_html(data.get('title') or name)}</b><small>{_escape_html(name)}</small><small class='gc-detail'>{detail}</small></div></div><div class='global-course-bar'><div style='width:{cp}%;'></div></div><strong>{cp}%</strong></div>")
+  st = _global_progress_stats()
   pct = st['percent']
   quiz_avg = f"{st['quiz_avg']}%" if st['quiz_avg'] is not None else "—"
   oral_avg = f"{st['oral_avg']:.1f}/10" if st['oral_avg'] is not None else "—"
-  return _progress_carousel_html() + f"""<div class='global-progress-hero gp-open' role='button' tabindex='0' title='Voir le détail par cours'><div class='global-progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div><div class='global-progress-copy'><h2>Progression globale</h2><p>Moyenne de la progression de tous vos cours. Chaque cours compte 3 activités (flashcards, quiz, colle orale) : une activité non commencée compte pour 0 %.</p><span class='gp-hint'>Voir le détail par cours →</span></div></div><div class='global-metrics'><div><b>{st['courses']}</b><span>Cours importés</span><small>dans votre espace</small></div><div><b>{st['started']}</b><span>Cours commencés</span><small>au moins une activité faite</small></div><div><b>{st['known']}/{st['flashcards']}</b><span>Flashcards maîtrisées</span><small>tous cours confondus</small></div><div><b>{quiz_avg}</b><span>Moyenne des quiz</span><small>{st['quizzes']} quiz terminé(s), tous cours</small></div><div><b>{oral_avg}</b><span>Moyenne des colles</span><small>{st['orals']} colle(s), tous cours</small></div></div><div class='global-course-list'><div class='global-list-title'>Progression par cours</div>{''.join(rows)}</div><div class='global-detail-hint'>Le détail pédagogique reste lié au cours sélectionné : activités, points forts, points faibles et prochaine étape.</div>"""
+  # Une seule vue par cours : le carrousel (ouvert en cliquant sur la carte) ; ici, uniquement les chiffres globaux.
+  return _progress_carousel_html() + f"""<div class='global-progress-hero gp-open' role='button' tabindex='0' title='Voir le détail par cours'><div class='global-progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div><div class='global-progress-copy'><h2>Progression globale</h2><p>Moyenne de vos {st['courses']} cours. Chaque cours compte 3 activités : flashcards, quiz et colle orale.</p><span class='gp-hint'>Voir le détail par cours →</span></div></div><div class='global-metrics'><div><b>{st['started']}/{st['courses']}</b><span>Cours commencés</span></div><div><b>{st['known']}/{st['flashcards']}</b><span>Flashcards maîtrisées</span></div><div><b>{quiz_avg}</b><span>Moyenne des quiz</span><small>{st['quizzes']} quiz terminé(s)</small></div><div><b>{oral_avg}</b><span>Moyenne des colles</span><small>{st['orals']} colle(s)</small></div></div>"""
 
 
-GP_COLORS = ["#2ea383", "#e0a43a", "#4f6df5", "#e86fb0", "#8e6cf4", "#06b6d4"]
+GP_COLORS = ["#4f6df5", "#8e6cf4"]   # palette de l'application (bleu → violet), comme les autres barres
 FR_MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 
 
@@ -1150,7 +1146,7 @@ def _progress_carousel_html():
         ring = (f"<svg viewBox='0 0 140 140' class='gp-ring' aria-hidden='true'><circle cx='70' cy='70' r='52' class='gp-track-c'/>{val}</svg>"
                 f"<b class='gp-pct'>{pct}%</b>")
         bars = "".join(
-            f"<div class='gp-bar'><span>{lab}</span><div><i style='width:{v}%;background:{color}'></i></div><em>{shown}</em></div>"
+            f"<div class='gp-bar'><span>{lab}</span><div><i style='width:{v}%'></i></div><em>{shown}</em></div>"
             for lab, v, shown in (
                 ("Flashcards", cs["flash_pct"], f"{cs['flash_pct']}%" if cs["flash_answered"] else "—"),
                 ("Quiz", cs["quiz_pct"], f"{cs['quiz_pct']}%" if cs["quizzes"] else "—"),
@@ -1221,9 +1217,9 @@ def progress_detail_html(active_doc=None):
           f"<span><b>{cs['pins']}</b> chapitre(s) épinglé(s) dans À revoir</span></div>")
   return f"""
   <div class='progress-hero'>
-    <div class='progress-ring'><span class='cu'>{pct}%</span></div>
+    <div class='progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div>
     <div><div class='progress-title'>Progression du cours · {_escape_html(data.get('title') or active_doc)}</div>
-    <div class='progress-sub'>Moyenne de 3 activités : flashcards, quiz et colle orale ({cs['started']}/3 commencées). Une activité non commencée compte pour 0 %.</div></div>
+    <div class='progress-sub'>{cs['started']}/3 activités commencées · une activité non commencée compte pour 0 %.</div></div>
   </div>
   <div class='act-list'>{activities}</div>
   {info}
@@ -2913,61 +2909,197 @@ def _plan_scope_choices():
     return choices
 
 
+PLAN_KIND_COLOR = {"summary": "#4f6df5", "reread": "#8e6cf4", "flash": "#e0a43a", "quiz": "#2ea383", "oral": "#e86fb0", "final": "#4f6df5"}
+PLAN_KIND_GO = {"summary": "summary", "reread": "summary", "flash": "flash", "quiz": "quiz", "oral": "oral", "final": "oral"}
+FR_MONTHS_LONG = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+
+def _plan_short(name, n=34):
+    data = documents_db.get(name, {})
+    t = data.get("title") or os.path.splitext(name)[0]
+    return t if len(t) <= n else t[:n - 1] + "…"
+
+
+def _plan_done_pct(cfg, names, plan):
+    """Part du plan réalisée : séances faites depuis la création du plan / (faites + restantes)."""
+    since = _parse_day(cfg.get("created")) or _date.today()
+    done = sum(1 for r in _read_sessions() if r.get("k") in ("flash", "quiz", "oral", "summary") and r.get("doc") in names
+               and (_parse_day(r.get("t")) or _date.min) >= since)
+    remaining = sum(1 for day in plan["days"] for t in day if not t.get("done"))
+    return round(done / (done + remaining) * 100) if (done + remaining) else 0
+
+
+def _plan_week_cards(week_days, plan, multi):
+    """Regroupe les séances d'une semaine par (cours, activité) : une carte par groupe, pas une liste par jour."""
+    groups = {}
+    for offset, tasks in week_days:
+        for t in tasks:
+            g = groups.setdefault((t["doc"], t["kind"]), {"t": t, "minutes": 0, "days": [], "pages": {}, "today": False,
+                                                           "done": False, "prio": 0})
+            g["minutes"] += t["minutes"]
+            g["days"].append(offset)
+            g["prio"] = max(g["prio"], t.get("prio", 0))
+            for pg in t.get("pages") or []:
+                g["pages"][pg["page"]] = pg
+            if offset == 0:
+                g["today"] = True
+                g["done"] = g["done"] or bool(t.get("done"))
+    cards = []
+    order = sorted(groups.values(), key=lambda g: (min(g["days"]), -g["prio"]))
+    for g in order:
+        t = g["t"]
+        later = [d for d in g["days"] if d > 0]
+        if g["today"] and g["done"]:
+            status, cls = ("En cours", "st-run") if later else ("Fait", "st-ok")
+        elif g["today"]:
+            status, cls = "À faire", "st-todo"
+        elif g["prio"] <= 4:
+            status, cls = "Facultative", "st-opt"
+        else:
+            status, cls = "Planifiée", "st-plan"
+        when = []
+        for d in g["days"][:6]:
+            day = plan["today"] + _timedelta(days=d)
+            when.append("Aujourd'hui" if d == 0 else ("Demain" if d == 1 else f"{PLAN_DAYS[day.weekday()][:3]}. {day.strftime('%d/%m')}"))
+        pages = "".join(f"<span class='plan-page' title='{_escape_html(', '.join(pg.get('reasons', [])))}'>p. {int(pg['page'])}"
+                        f"{(' · ' + _escape_html(pg['section'][:26])) if pg.get('section') else ''}</span>" for pg in list(g["pages"].values())[:6])
+        n = len(g["days"])
+        doc = _escape_html(t["doc"])
+        color = PLAN_KIND_COLOR.get(t["kind"], "#4f6df5")
+        go_tab = PLAN_KIND_GO.get(t["kind"], "summary")
+        launch = ("<span class='pl-launched'>✅ Séance faite</span>" if g["done"] and not later else
+                  f"<button type='button' class='pl-go ak-t-{go_tab}' data-doc='{doc}'>Lancer la séance</button>")
+        more = (f"<div class='pl-more'><div><b>Cours</b><span>{_escape_html(_plan_short(t['doc'], 60))}</span></div>"
+                f"<div><b>Séances</b><span>{n} · {' · '.join(when)}{' …' if n > 6 else ''}</span></div>"
+                + (f"<div><b>Pages</b><span class='plan-pages'>{pages}</span></div>" if pages else "") + "</div>")
+        cards.append(
+            f"<div class='pl-task' style='--k:{color}'><div class='pl-top'><span class='pl-ico'>{PLAN_KIND_ICON.get(t['kind'], '📌')}</span>"
+            f"<div class='pl-tt'><b>{_escape_html(t['label'])}</b>"
+            f"{('<em>' + _escape_html(_plan_short(t['doc'], 28)) + '</em>') if multi else ''}</div></div>"
+            f"<div class='pl-meta'><span class='pl-min'>🕑 {g['minutes']} min{(' · ' + str(n) + ' séances') if n > 1 else ''}</span>"
+            f"<span class='pl-st {cls}'>{status}</span></div>{more}"
+            f"<div class='pl-btns'><button type='button' class='pl-det'>Détails</button>{launch}</div></div>")
+    if len(cards) > 4:
+        rest = len(cards) - 4
+        cards = cards[:4] + [f"<button type='button' class='pl-showall'>+ {rest} autre(s) séance(s) cette semaine</button>"] + \
+                [c.replace("<div class='pl-task'", "<div class='pl-task pl-extra'", 1) for c in cards[4:]]
+    return "".join(cards)
+
+
 def plan_html():
     cfg = _space().get("plan") or {}
     exam = _parse_day(cfg.get("exam_date"))
     if not exam:
-        return ("<div class='empty-study'>📅<br><b>Indiquez la date de votre examen.</b><br>AKORI construit alors un plan jour par jour, "
+        return ("<div class='empty-study'>📅<br><b>Indiquez la date de votre examen.</b><br>AKORI construit alors un plan semaine par semaine, "
                 "avec les pages à relire et une répétition espacée, et le met à jour après chaque séance.</div>")
     names = _plan_names(cfg.get("scope"))
-    plan = build_plan(exam, names, int(cfg.get("minutes", 40) or 40))
+    minutes = int(cfg.get("minutes", 40) or 40)
     title = _escape_html(cfg.get("exam_name") or "Votre examen")
     if not names:
         return "<div class='empty-study'>Aucun cours dans la portée choisie. Importez un PDF ou changez la portée du plan.</div>"
+    plan = build_plan(exam, names, minutes)
     if plan is None:
-        return (f"<div class='plan-head'><div><b>{title}</b><span>{exam.strftime('%d/%m/%Y')}</span></div><div class='plan-count plan-past'>Passé</div></div>"
-                "<div class='empty-study'>La date de l'examen est dépassée : choisissez une nouvelle date pour relancer un plan.</div>")
-    ready = round(sum(_course_stats(n)["percent"] for n in names) / len(names))
-    weak_total = sum(len(_weak_pages(n)) for n in names)
-    d_label = "Jour J" if plan["days_left"] == 0 else f"J-{plan['days_left']}"
-    head = (f"<div class='plan-head'><div><b>{title}</b><span>{exam.strftime('%d/%m/%Y')} · {len(names)} cours</span></div>"
-            f"<div class='plan-count'>{d_label}</div></div>"
-            f"<div class='plan-kpis'><div><b class='cu'>{ready}%</b><span>de préparation estimée</span></div>"
-            f"<div><b class='cu'>{weak_total}</b><span>page(s) faible(s) à relire</span></div>"
-            f"<div><b class='cu'>{sum(plan['load'][:7])}</b><span>min de révision cette semaine</span></div></div>")
+        return ("<div class='empty-study'>La date de l'examen est dépassée : cliquez sur « Modifier » pour choisir une nouvelle date.</div>")
     multi = len(names) > 1
-    blocks = []
-    for offset, tasks in enumerate(plan["days"]):
-        day = plan["today"] + _timedelta(days=offset)
-        label = "Aujourd'hui" if offset == 0 else ("Demain" if offset == 1 else f"{PLAN_DAYS[day.weekday()].capitalize()} {day.strftime('%d/%m')}")
-        if not tasks:
-            body = "<div class='plan-rest'>Jour de repos : laissez la mémoire consolider.</div>"
+    pct = _plan_done_pct(cfg, names, plan)
+    circ = 2 * 3.14159 * 20
+    ring = (f"<svg viewBox='0 0 48 48' class='pl-ring' aria-hidden='true'><circle cx='24' cy='24' r='20' class='pl-ring-t'/>"
+            + (f"<circle cx='24' cy='24' r='20' class='pl-ring-v' stroke-dasharray='{circ * pct / 100:.1f} {circ:.1f}' transform='rotate(-90 24 24)'/>" if pct else "")
+            + f"</svg><b>{pct}%</b>")
+    d_label = "Jour J" if plan["days_left"] == 0 else f"J-{plan['days_left']}"
+    head = (f"<div class='pl-head'>"
+            f"<div class='pl-hc'><b>{title}</b><span>{len(names)} cours</span></div>"
+            f"<div class='pl-hc'><b>{exam.day} {FR_MONTHS_LONG[exam.month - 1]} {exam.year}</b><span>{d_label}</span></div>"
+            f"<div class='pl-hc'><b>{minutes} min/jour</b><span>{sum(plan['load'][:7])} min cette semaine</span></div>"
+            f"<div class='pl-hc pl-prog'><span class='pl-ringw'>{ring}</span><span>Plan de révision<br><b>{pct} % terminé</b></span></div></div>")
+    # Semaines repliables
+    n_weeks = (plan["horizon"] + 6) // 7
+    weeks = []
+    for w in range(n_weeks):
+        span = [(o, plan["days"][o]) for o in range(w * 7, min(plan["horizon"], w * 7 + 7))]
+        if not any(t for _, t in span):
+            continue
+        a, b = plan["today"] + _timedelta(days=span[0][0]), plan["today"] + _timedelta(days=span[-1][0])
+        if n_weeks == 1:
+            name = "Priorités et revue finale"
+        elif w == 0:
+            name = "Vue d'ensemble et priorités"
+        elif w == n_weeks - 1:
+            name = "Revue finale"
         else:
-            rows = []
-            for t in tasks:
-                pages = ""
-                if t["pages"]:
-                    pages = "<div class='plan-pages'>" + "".join(
-                        f"<span class='plan-page' title='{_escape_html(', '.join(p['reasons']))}'>p. {int(p['page'])}"
-                        f"{(' · ' + _escape_html(p['section'][:28])) if p.get('section') else ''}</span>" for p in t["pages"]) + "</div>"
-                doc_chip = f"<span class='plan-doc'>{_escape_html(os.path.splitext(t['doc'])[0][:30])}</span>" if multi else ""
-                tab = PLAN_KIND_TAB.get(t["kind"])
-                go = f"<button type='button' class='ak-act ak-go ak-t-{tab}'>▶ <span>Commencer</span></button>" if tab and offset == 0 and not t.get("done") else ""
-                done = "<span class='plan-done'>✅ <span>Fait</span></span>" if t.get("done") else ""
-                rows.append(f"<div class='plan-task{' plan-task-done' if t.get('done') else ''}'><span class='plan-ico'>{PLAN_KIND_ICON.get(t['kind'], '📌')}</span>"
-                            f"<div class='plan-main'><b>{_escape_html(t['label'])}</b>{doc_chip}{pages}</div>"
-                            f"<span class='plan-min'>{t['minutes']} min</span>{done}{go}</div>")
-            body = "".join(rows)
-        block = (f"<div class='plan-day{' plan-today' if offset == 0 else ''}' style='--i:{min(offset, 12)}'><div class='plan-day-head'><b>{label}</b>"
-                 f"<span>{plan['load'][offset]} min</span></div>{body}</div>")
-        blocks.append(block)
-    shown, rest = blocks[:14], blocks[14:]
-    more = f"<details class='plan-more'><summary>Voir les {len(rest)} jours suivants</summary>{''.join(rest)}</details>" if rest else ""
-    exam_day = ("<div class='plan-day plan-exam'><div class='plan-day-head'><b>Jour de l'examen</b><span>" + exam.strftime('%d/%m') +
-                "</span></div><div class='plan-rest'>Relis seulement ton résumé et tes flashcards à revoir. Fais confiance à ta préparation.</div></div>") if plan["days_left"] > 0 else ""
-    note = ("<p class='plan-note'>Ce plan se recalcule après chaque séance : une activité réussie revient plus tard (1, 3, 7 puis 14 jours), "
-            "un mauvais résultat la rapproche et ajoute les pages à relire.</p>")
-    return head + note + "".join(shown) + more + exam_day
+            name = "Consolidation"
+        mins = sum(plan["load"][o] for o, _ in span)
+        weeks.append(f"<details class='pl-week'{' open' if not weeks else ''}><summary><b>Semaine {w + 1} : {name}</b>"
+                     f"<span>{a.strftime('%d/%m')} – {b.strftime('%d/%m')} · {mins} min</span><i class='pl-chev'></i></summary>"
+                     f"<div class='pl-grid'>{_plan_week_cards(span, plan, multi)}</div></details>")
+    # Priorités et thèmes (un thème par cours)
+    prios, themes = [], []
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for i, name in enumerate(names):
+        cs = _course_stats(name)
+        weak = _weak_pages(name)
+        level = 0 if (cs["percent"] < 40 or len(weak) >= 3) else (1 if cs["percent"] < 70 else 2)
+        prios.append((level, cs["percent"], name, len(weak)))
+        if i < 8:
+            chips = "".join(f"<span class='plan-page' title='{_escape_html(', '.join(pg['reasons']))}'>p. {int(pg['page'])}"
+                            f"{(' · ' + _escape_html(pg['section'][:26])) if pg.get('section') else ''}</span>" for pg in weak[:8])
+            stats = (f"Flashcards {_pct_or_dash(cs['flash_pct'], cs['flash_total'])} · Quiz {_pct_or_dash(cs['quiz_pct'], cs['quizzes'])}"
+                     f" · Colle {_pct_or_dash(cs['oral_pct'], cs['orals'])}")
+            themes.append(f"<details class='pl-theme'><summary><b>Thème {letters[i]} : {_escape_html(_plan_short(name, 48))}</b>"
+                          f"<span>{cs['percent']} % prêt</span><i class='pl-chev'></i></summary><div class='pl-theme-b'>"
+                          f"<p>{stats}</p>"
+                          + (f"<div class='plan-pages'>{chips}</div>" if chips else "<p class='pl-ok'>Aucune page faible détectée pour l'instant.</p>")
+                          + "</div></details>")
+    lv_name = ["Haute priorité", "Moyenne priorité", "Basse priorité"]
+    prio_html = "".join(
+        f"<div class='pl-prio pr-{lv}'><i></i><div><b>{_escape_html(_plan_short(n, 40))} <span>({lv_name[lv]})</span></b>"
+        f"<small>{pc} % prêt{(' · ' + str(nw) + ' page(s) faible(s)') if nw else ''}</small></div></div>"
+        for lv, pc, n, nw in sorted(prios)[:4])
+    # Calendrier complet (grille, sans défilement)
+    cells = []
+    first = plan["today"]
+    for _ in range(first.weekday()):
+        cells.append("<div class='pl-cd pl-cd-x'></div>")
+    for o in range(plan["horizon"]):
+        day = first + _timedelta(days=o)
+        tasks = plan["days"][o]
+        dots = "".join(f"<i style='background:{PLAN_KIND_COLOR.get(t['kind'], '#4f6df5')}'></i>" for t in tasks[:4])
+        lst = "".join(f"<li>{PLAN_KIND_ICON.get(t['kind'], '📌')} {_escape_html(t['label'])}"
+                      f"{(' · ' + _escape_html(_plan_short(t['doc'], 22))) if multi else ''} <em>{t['minutes']} min</em></li>" for t in tasks)
+        label = "Aujourd'hui" if o == 0 else f"{PLAN_DAYS[day.weekday()].capitalize()} {day.strftime('%d/%m')}"
+        cells.append(f"<button type='button' class='pl-cd{' on' if o == 0 else ''}{' rest' if not tasks else ''}'><b>{day.day}</b>"
+                     f"<span class='pl-dots'>{dots}</span><small>{plan['load'][o] or ''}{' min' if plan['load'][o] else ''}</small>"
+                     f"<template><h4>{label} · {plan['load'][o]} min</h4>"
+                     f"{('<ul>' + lst + '</ul>') if lst else '<p>Jour de repos : laissez la mémoire consolider.</p>'}</template></button>")
+    if plan["days_left"] > 0:
+        cells.append(f"<button type='button' class='pl-cd exam'><b>{exam.day}</b><span class='pl-dots'>🏆</span><small>Examen</small>"
+                     "<template><h4>Jour de l'examen</h4><p>Relisez seulement votre résumé et vos flashcards à revoir.</p></template></button>")
+    heads = "".join(f"<span>{d[:3]}.</span>" for d in PLAN_DAYS)
+    cal = (f"<div class='pl-cal'><div class='pl-cal-h'>{heads}</div><div class='pl-cal-g'>{''.join(cells)}</div>"
+           "<div class='pl-cal-detail'>Touchez un jour pour voir ses séances.</div></div>")
+    adjust = ("<div class='pl-adjust'><span>Temps par jour :</span>" + "".join(
+        f"<button type='button' class='pl-mins{' on' if m == minutes else ''}' data-m='{m}'>{m} min</button>" for m in (20, 30, 40, 60, 90, 120)) + "</div>")
+    actions = ("<div class='pl-actions'><button type='button' class='pl-btn pl-primary pl-edit'>Modifier le plan</button>"
+               "<button type='button' class='pl-btn pl-cal-t'>Voir calendrier complet</button>"
+               "<button type='button' class='pl-btn pl-adj-t'>Ajuster le temps 🕑</button></div>")
+    return (f"<div class='pl-card'><div class='pl-eyebrow'>MON EXAMEN</div>{head}{''.join(weeks)}"
+            f"<div class='pl-sec'>Priorités du plan</div><div class='pl-prios'>{prio_html}</div>"
+            f"{''.join(themes)}{cal}{adjust}{actions}"
+            "<p class='plan-note'>Le plan se recalcule après chaque séance : une activité réussie revient plus tard (1, 3, 7 puis 14 jours), "
+            "un mauvais résultat la rapproche et ajoute les pages à relire.</p></div>")
+
+
+def plan_set_minutes(value):
+    """Bouton « Ajuster le temps » : change les minutes par jour sans rouvrir le formulaire."""
+    try:
+        m = max(10, min(240, int(str(value).split(":")[0])))
+    except (TypeError, ValueError):
+        return gr.update(), gr.update()
+    space = _space()
+    if space.get("plan"):
+        space["plan"]["minutes"] = m
+        _space_save(space)
+    return plan_html(), m
 
 
 def plan_save(exam_date, exam_name, scope, minutes):
@@ -2977,8 +3109,9 @@ def plan_save(exam_date, exam_name, scope, minutes):
     if day < _date.today():
         return plan_html(), "⚠️ Cette date est déjà passée : choisissez la date de votre prochain examen."
     space = _space()
+    prev = space.get("plan") or {}
     space["plan"] = {"exam_date": day.isoformat(), "exam_name": str(exam_name or "").strip()[:60], "scope": scope or "all",
-                     "minutes": max(10, min(240, int(minutes or 40)))}
+                     "minutes": max(10, min(240, int(minutes or 40))), "created": (prev.get("created") if prev.get("exam_date") == day.isoformat() else None) or _date.today().isoformat()}
     _space_save(space)
     _log("plan_save", detail=day.isoformat())
     return plan_html(), "✅ Plan de révision mis à jour."
@@ -6062,6 +6195,118 @@ html:root:root:root:root body.akori-dark { --ak-field-border:#363a44; }
 html:root:root:root:root body .ak-datepick { border-color:var(--ak-field-border)!important; }
 html:root:root:root:root body.akori-dark #login-wrap .auth-card .input-container, html:root:root:root:root body.akori-dark #login-wrap .auth-card .wrap, html:root:root:root:root body #login-wrap .auth-card .input-container { background:transparent!important;border-color:transparent!important;box-shadow:none!important; }
 
+/* ===== Progression : couleurs alignées sur l'application (bleu → violet, cartes sombres de l'app) ===== */
+body > .gp-modal { background:radial-gradient(40rem circle at 30% 20%, rgba(79,109,245,.22), transparent 60%), radial-gradient(36rem circle at 75% 30%, rgba(142,108,244,.18), transparent 60%), rgba(10,14,24,.84)!important; }
+body > .gp-modal .gp-card { background:#161e30!important;border-color:#27324a!important; }
+.gp-track-c { stroke:#27324a!important; } .gp-bar > div, .gp-dot, .gp-chip { background:#1f2a42!important; } .gp-dot { border-color:#161e30!important; }
+.gp-bar i { background:linear-gradient(90deg,#4f6df5,#8e6cf4)!important; }
+.gp-date, .gp-bar, .gp-sub { color:#9aa6bf!important; }
+html:root:root:root:root body .global-progress-ring { background:conic-gradient(#4f6df5 var(--progress,0%), var(--ak-soft) 0)!important; }
+html:root:root:root:root body .progress-ring { background:conic-gradient(#4f6df5 var(--progress,0%), var(--ak-soft) 0)!important;flex:none!important;aspect-ratio:1; }
+html:root:root:root:root body .global-metrics { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+html:root:root:root:root body .global-metrics b { color:var(--ak-text)!important; }
+
+/* ===== Plan de révision : carte « Mon examen » cliquable (semaines repliables, cartes de séance) ===== */
+html:root:root:root:root body .pl-card { display:flex;flex-direction:column;gap:.85rem; }
+html:root:root:root:root body .pl-eyebrow { font-size:.72rem;font-weight:800;letter-spacing:.14em;color:var(--ak-muted); }
+html:root:root:root:root body .pl-head { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.85rem 1rem; }
+html:root:root:root:root body .pl-hc { display:flex;flex-direction:column;justify-content:center;gap:.15rem;min-width:0;padding-right:.6rem;border-right:1px solid var(--ak-line); }
+html:root:root:root:root body .pl-hc:last-child { border-right:0;padding-right:0; }
+html:root:root:root:root body .pl-hc > b { font-size:.98rem;color:var(--ak-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+html:root:root:root:root body .pl-hc > span { font-size:.76rem;color:var(--ak-muted);line-height:1.3; }
+html:root:root:root:root body .pl-hc > span b { color:var(--ak-text); }
+html:root:root:root:root body .pl-prog { flex-direction:row;align-items:center;justify-content:flex-start;gap:.6rem; }
+html:root:root:root:root body .pl-ringw { position:relative;width:2.9rem;height:2.9rem;flex:none;display:flex;align-items:center;justify-content:center; }
+html:root:root:root:root body .pl-ring { position:absolute;inset:0;width:100%;height:100%; }
+html:root:root:root:root body .pl-ring circle { fill:none;stroke-width:5; } html:root:root:root:root body .pl-ring-t { stroke:var(--ak-soft); } html:root:root:root:root body .pl-ring-v { stroke:#4f6df5;stroke-linecap:round; }
+html:root:root:root:root body .pl-ringw b { position:relative;font-size:.7rem;color:var(--ak-text); }
+html:root:root:root:root body .pl-week, html:root:root:root:root body .pl-theme { border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);overflow:hidden; }
+html:root:root:root:root body .pl-week > summary, html:root:root:root:root body .pl-theme > summary { list-style:none;display:flex;align-items:center;gap:.6rem;padding:.8rem 1rem;cursor:pointer;user-select:none; }
+html:root:root:root:root body .pl-week > summary::-webkit-details-marker, html:root:root:root:root body .pl-theme > summary::-webkit-details-marker { display:none; }
+html:root:root:root:root body .pl-week > summary b, html:root:root:root:root body .pl-theme > summary b { flex:1;min-width:0;color:var(--ak-text);font-size:.93rem; }
+html:root:root:root:root body .pl-week > summary span, html:root:root:root:root body .pl-theme > summary span { color:var(--ak-muted);font-size:.76rem;white-space:nowrap; }
+html:root:root:root:root body .pl-chev { width:.5rem;height:.5rem;flex:none;border-right:2px solid var(--ak-muted);border-bottom:2px solid var(--ak-muted);transform:rotate(45deg);transition:transform .2s ease;margin:0 .2rem -.1rem .2rem; }
+html:root:root:root:root body details[open] > summary .pl-chev { transform:rotate(-135deg);margin-bottom:-.3rem; }
+html:root:root:root:root body .pl-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;padding:0 1rem 1rem; }
+html:root:root:root:root body .pl-task { display:flex;flex-direction:column;gap:.5rem;min-width:0;border:1px solid var(--ak-line);border-radius:.9rem;padding:.75rem;background:color-mix(in srgb, var(--ak-soft) 45%, transparent);animation:akfade .35s ease both; }
+html:root:root:root:root body .pl-top { display:flex;gap:.65rem;align-items:flex-start; }
+html:root:root:root:root body .pl-ico { width:2.2rem;height:2.2rem;border-radius:.65rem;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--k) 20%, transparent);color:var(--k);font-size:1rem; }
+html:root:root:root:root body .pl-ico .ak-ico svg { width:1.05rem;height:1.05rem; }
+html:root:root:root:root body .pl-tt { min-width:0; } html:root:root:root:root body .pl-tt b { display:block;font-size:.86rem;line-height:1.3;color:var(--ak-text); }
+html:root:root:root:root body .pl-tt em { display:block;font-style:normal;font-size:.73rem;color:var(--ak-muted);margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+html:root:root:root:root body .pl-meta { display:flex;justify-content:space-between;align-items:center;gap:.4rem;flex-wrap:wrap; }
+html:root:root:root:root body .pl-min { font-size:.76rem;color:var(--ak-muted);display:inline-flex;align-items:center;gap:.25rem; }
+html:root:root:root:root body .pl-min .ak-ico svg { width:.85rem;height:.85rem; }
+html:root:root:root:root body .pl-st { font-size:.7rem;font-weight:700;padding:.16rem .6rem;border-radius:99px;white-space:nowrap; }
+html:root:root:root:root body .st-todo, html:root:root:root:root body .st-ok { background:rgba(46,163,131,.16);color:#2ea383; }
+html:root:root:root:root body .st-run { background:rgba(224,164,58,.18);color:#d4952a; }
+html:root:root:root:root body .st-opt { background:var(--ak-soft);color:var(--ak-muted); }
+html:root:root:root:root body .st-plan { background:rgba(79,109,245,.14);color:#6b84f7; }
+html:root:root:root:root body .pl-more { display:none; }
+html:root:root:root:root body .pl-task.open .pl-more { display:grid;gap:.3rem;font-size:.76rem;padding:.5rem .6rem;border-radius:.6rem;background:var(--ak-card); }
+html:root:root:root:root body .pl-more > div { display:flex;gap:.5rem;align-items:flex-start; } html:root:root:root:root body .pl-more > div > b { flex:none;min-width:3.8rem;color:var(--ak-muted);font-weight:600; }
+html:root:root:root:root body .pl-more > div > span { color:var(--ak-text);min-width:0; }
+html:root:root:root:root body .pl-btns { display:flex;gap:.45rem;margin-top:auto; }
+html:root:root:root:root body .pl-det, html:root:root:root:root body .pl-go { flex:1;min-width:0;border-radius:.6rem;padding:.45rem .5rem;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:filter .15s ease,background .15s ease; }
+html:root:root:root:root body .pl-det { background:transparent;border:1px solid var(--ak-line);color:var(--ak-text); }
+html:root:root:root:root body .pl-det:hover { background:var(--ak-soft); }
+html:root:root:root:root body .pl-go, html:root:root:root:root body.akori-dark .pl-go { background:#4f6df5!important;border:1px solid #4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; } html:root:root:root:root body .pl-go:hover { filter:brightness(1.1); }
+html:root:root:root:root body .pl-launched { flex:1;display:inline-flex;align-items:center;justify-content:center;gap:.25rem;font-size:.78rem;color:#2ea383; }
+html:root:root:root:root body .pl-sec { font-weight:800;color:var(--ak-text);font-size:.93rem;margin-top:.15rem; }
+html:root:root:root:root body .pl-prios { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem; }
+html:root:root:root:root body .pl-prio { display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--ak-line);border-radius:.9rem;background:var(--ak-card);padding:.65rem .85rem;min-width:0; }
+html:root:root:root:root body .pl-prio > i { width:.6rem;height:.6rem;border-radius:50%;margin-top:.35rem;flex:none; }
+html:root:root:root:root body .pr-0 > i { background:#e5484d; } html:root:root:root:root body .pr-1 > i { background:#e0a43a; } html:root:root:root:root body .pr-2 > i { background:#2ea383; }
+html:root:root:root:root body .pl-prio b { font-size:.85rem;color:var(--ak-text); } html:root:root:root:root body .pl-prio b span { font-weight:600;color:var(--ak-muted); }
+html:root:root:root:root body .pl-prio small { display:block;font-size:.74rem;color:var(--ak-muted);margin-top:.1rem; }
+html:root:root:root:root body .pl-theme-b { padding:0 1rem .9rem;font-size:.8rem;color:var(--ak-muted); } html:root:root:root:root body .pl-theme-b p { margin:0 0 .5rem; }
+html:root:root:root:root body .pl-cal, html:root:root:root:root body .pl-adjust { display:none; }
+html:root:root:root:root body .pl-card.cal-open .pl-cal { display:block;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.8rem;animation:akfade .25s ease both; }
+html:root:root:root:root body .pl-cal-h, html:root:root:root:root body .pl-cal-g { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.3rem; }
+html:root:root:root:root body .pl-cal-h { margin-bottom:.3rem; } html:root:root:root:root body .pl-cal-h span { text-align:center;font-size:.68rem;color:var(--ak-muted);text-transform:capitalize; }
+html:root:root:root:root body .pl-cd { display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.15rem;padding:.35rem .1rem;border-radius:.6rem;border:1px solid var(--ak-line);background:transparent;color:var(--ak-text);cursor:pointer;min-height:3.1rem;min-width:0; }
+html:root:root:root:root body .pl-cd b { font-size:.8rem; } html:root:root:root:root body .pl-cd small { font-size:.6rem;color:var(--ak-muted);white-space:nowrap; }
+html:root:root:root:root body .pl-dots { display:flex;gap:2px;min-height:6px;font-size:.7rem; } html:root:root:root:root body .pl-dots i { width:6px;height:6px;border-radius:50%; }
+html:root:root:root:root body .pl-cd.rest { opacity:.5; } html:root:root:root:root body .pl-cd.on { border-color:#4f6df5; } html:root:root:root:root body .pl-cd.sel { background:rgba(79,109,245,.14); }
+html:root:root:root:root body .pl-cd.exam { border-style:dashed;border-color:#e0a43a; } html:root:root:root:root body .pl-cd-x { visibility:hidden; }
+html:root:root:root:root body .pl-cal-detail { margin-top:.6rem;font-size:.78rem;color:var(--ak-muted); }
+html:root:root:root:root body .pl-cal-detail h4 { margin:0 0 .3rem;color:var(--ak-text);font-size:.84rem; } html:root:root:root:root body .pl-cal-detail ul { margin:0;padding-left:1.1rem; } html:root:root:root:root body .pl-cal-detail li { margin:.15rem 0;color:var(--ak-text); }
+html:root:root:root:root body .pl-cal-detail li em { color:var(--ak-muted);font-style:normal; } html:root:root:root:root body .pl-cal-detail p { margin:0; }
+html:root:root:root:root body .pl-card.adj-open .pl-adjust { display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.7rem .9rem;animation:akfade .25s ease both; }
+html:root:root:root:root body .pl-adjust > span { font-size:.8rem;color:var(--ak-muted);margin-right:.2rem; }
+html:root:root:root:root body .pl-mins { border:1px solid var(--ak-line);background:transparent;color:var(--ak-text);border-radius:99px;padding:.3rem .8rem;font-size:.78rem;cursor:pointer; }
+html:root:root:root:root body .pl-mins.on, html:root:root:root:root body.akori-dark .pl-mins.on { background:#4f6df5!important;border-color:#4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; }
+html:root:root:root:root body .pl-actions { display:flex;flex-wrap:wrap;gap:.6rem; }
+html:root:root:root:root body .pl-btn { flex:1 1 9rem;border-radius:.75rem;padding:.62rem 1rem;font-weight:700;font-size:.84rem;cursor:pointer;border:1px solid var(--ak-line);background:var(--ak-card);color:var(--ak-text);display:inline-flex;justify-content:center;align-items:center;gap:.35rem;transition:background .15s ease,filter .15s ease; }
+html:root:root:root:root body .pl-btn:hover { background:var(--ak-soft); }
+html:root:root:root:root body .pl-btn.pl-primary, html:root:root:root:root body.akori-dark .pl-btn.pl-primary { background:#4f6df5!important;border-color:#4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; } html:root:root:root:root body .pl-btn.pl-primary:hover { filter:brightness(1.1);background:#4f6df5; }
+html:root:root:root:root body .pl-card.cal-open .pl-cal-t, html:root:root:root:root body .pl-card.adj-open .pl-adj-t { border-color:#4f6df5; }
+html:root:root:root:root body .pl-btn .ak-ico svg { width:.95rem;height:.95rem; }
+html:root:root:root:root body .pl-card .plan-note { margin:0;font-size:.74rem; }
+html:root:root:root:root body .pl-cancel { display:none; }
+html:root:root:root:root body.plan-ready:not(.plan-editing) #plan-form-col { display:none!important; }
+html:root:root:root:root body.plan-ready.plan-editing .pl-cancel { display:inline-flex;float:right;margin-top:-1.7rem;border:1px solid var(--ak-line);background:transparent;color:var(--ak-muted);border-radius:99px;padding:.2rem .7rem;font-size:.75rem;cursor:pointer; }
+html:root:root:root:root body.ak-narrow .pl-head, html:root:root:root:root body.m-mode .pl-head { grid-template-columns:repeat(2,minmax(0,1fr)); }
+html:root:root:root:root body.ak-narrow .pl-hc:nth-child(2), html:root:root:root:root body.m-mode .pl-hc:nth-child(2) { border-right:0; }
+html:root:root:root:root body.m-mode .pl-grid, html:root:root:root:root body.m-mode .pl-prios { grid-template-columns:1fr; }
+html:root:root:root:root body.m-mode .pl-week > summary span { display:none; }
+html:root:root:root:root body.m-mode .pl-hc > b { white-space:normal;font-size:.9rem;line-height:1.25; } html:root:root:root:root body.m-mode .pl-det, html:root:root:root:root body.m-mode .pl-go { white-space:normal;font-size:.74rem;padding:.45rem .35rem; }
+html:root:root:root:root body #upload-opts { gap:.6rem;flex-wrap:wrap; }
+html:root:root:root:root body.m-mode #upload-opts, html:root:root:root:root body.m-mode #upload-opts > .form { flex-direction:column!important;flex-wrap:nowrap!important; } html:root:root:root:root body.m-mode #upload-opts .block { width:100%!important;min-width:0!important;flex:1 1 auto!important; }
+html:root:root:root:root body.plan-editing .pl-head { grid-template-columns:repeat(2,minmax(0,1fr)); } html:root:root:root:root body.plan-editing .pl-hc:nth-child(2) { border-right:0; } html:root:root:root:root body.plan-editing .pl-grid, html:root:root:root:root body.plan-editing .pl-prios { grid-template-columns:1fr; } html:root:root:root:root body.plan-editing .pl-hc > b { white-space:normal; }
+html:root:root:root:root body .pl-det, html:root:root:root:root body .pl-go { white-space:normal!important;line-height:1.2; }
+html:root:root:root:root body .gradio-container button.pl-go.pl-go, html:root:root:root:root body.akori-dark .gradio-container button.pl-go.pl-go, html:root:root:root:root body .gradio-container button.pl-btn.pl-primary, html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-primary, html:root:root:root:root body .gradio-container button.pl-mins.pl-mins.on, html:root:root:root:root body.akori-dark .gradio-container button.pl-mins.pl-mins.on { background:#4f6df5!important;border:1px solid #4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; }
+html:root:root:root:root body .gradio-container button.pl-det.pl-det, html:root:root:root:root body.akori-dark .gradio-container button.pl-det.pl-det, html:root:root:root:root body .gradio-container button.pl-mins.pl-mins:not(.on), html:root:root:root:root body.akori-dark .gradio-container button.pl-mins.pl-mins:not(.on), html:root:root:root:root body .gradio-container button.pl-cd.pl-cd, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd, html:root:root:root:root body .gradio-container button.pl-showall.pl-showall, html:root:root:root:root body.akori-dark .gradio-container button.pl-showall.pl-showall { background:transparent!important;color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;border:1px solid var(--ak-line)!important; }
+html:root:root:root:root body .gradio-container button.pl-showall.pl-showall, html:root:root:root:root body.akori-dark .gradio-container button.pl-showall.pl-showall { border-style:dashed!important;color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important; }
+html:root:root:root:root body .gradio-container button.pl-btn.pl-btn:not(.pl-primary), html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-btn:not(.pl-primary) { background:var(--ak-card)!important;color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;border:1px solid var(--ak-line)!important; }
+html:root:root:root:root body .gradio-container button.pl-det.pl-det:hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-det.pl-det:hover, html:root:root:root:root body .gradio-container button.pl-btn.pl-btn:not(.pl-primary):hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-btn:not(.pl-primary):hover, html:root:root:root:root body .gradio-container button.pl-mins.pl-mins:not(.on):hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-mins.pl-mins:not(.on):hover { background:var(--ak-soft)!important; }
+html:root:root:root:root body .gradio-container button.pl-cd.pl-cd.sel, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd.sel { background:rgba(79,109,245,.14)!important; } html:root:root:root:root body .gradio-container button.pl-cd.pl-cd.on, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd.on { border-color:#4f6df5!important; } html:root:root:root:root body .gradio-container button.pl-cd.pl-cd.exam, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd.exam { border:1px dashed #e0a43a!important; }
+html:root:root:root:root body .gradio-container button.pl-card .pl-cd-x, html:root:root:root:root body.akori-dark .gradio-container button.pl-card .pl-cd-x { visibility:hidden; }
+html:root:root:root:root body .gradio-container button.pl-cancel.pl-cancel, html:root:root:root:root body.akori-dark .gradio-container button.pl-cancel.pl-cancel { background:transparent!important;color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important;border:1px solid var(--ak-line)!important; }
+html:root:root:root:root body .gradio-container button.pl-go.pl-go:hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-go.pl-go:hover, html:root:root:root:root body .gradio-container button.pl-btn.pl-primary:hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-primary:hover { filter:brightness(1.1); }
+html:root:root:root:root body .pl-extra { display:none!important; } html:root:root:root:root body .pl-grid.all .pl-extra { display:flex!important; } html:root:root:root:root body .pl-grid.all .pl-showall { display:none; }
+html:root:root:root:root body .pl-showall { grid-column:1 / -1;border:1px dashed var(--ak-line)!important;background:transparent!important;color:var(--ak-muted)!important;border-radius:.8rem;padding:.55rem;font-size:.8rem;font-weight:700;cursor:pointer; } html:root:root:root:root body .pl-showall:hover { color:var(--ak-text)!important; }
+
 """
 
 
@@ -6087,6 +6332,7 @@ I18N_SRC = r"""
   I18N.push(["Touchez une réponse : la correction s'affiche aussitôt. Glissez vers la gauche pour passer à la question suivante.", "Tap an answer: the correction appears instantly. Swipe left to go to the next question."]);
   I18N.push(["Mes documents", "My documents"],["Modules · semestres", "Modules · semesters"],["Ajouter des PDF", "Add PDFs"],["Ranger les nouveaux PDF dans le module", "Put new PDFs in the module"],["Nouveau module", "New module"],["Supprimer", "Delete"],["Corriger", "Check"],["Dicter", "Dictate"],["Nouvelle question", "New question"],["Votre réponse", "Your answer"],["Écrivez ou dictez votre réponse…", "Type or dictate your answer…"],["La correction s'affichera ici.", "The correction will appear here."],["Note sur 10, points manquants et page à relire.", "Mark out of 10, missing points and page to reread."],["✦ Générer le résumé", "✦ Generate summary"],["Les points clés du cours actif, conservés avec le document.", "Key points of the active course, saved with the document."],["Vue d'ensemble", "Overview"],["Cours actif", "Active course"],["Mon examen", "My exam"],["Cours concernés", "Courses included"],["Minutes par jour", "Minutes per day"],["Mon journal de révision", "My revision journal"],["Thème clair ou sombre.", "Light or dark theme."],["Interface et réponses de l'IA.", "Interface and AI answers."],["Que voulez-vous faire ?", "What do you want to do?"],["Touchez une fonction pour voir comment elle marche.", "Tap a feature to see how it works."],["Cours importés", "Imported courses"],["Passages indexés (cours actif)", "Indexed passages (active course)"],["Questions posées (cours actif)", "Questions asked (active course)"],["Progression du cours actif", "Active course progress"],["AKORI · Espace de révision", "AKORI · Revision space"],["Vos cours,", "Your courses,"],["votre réussite", "your success"],["Un assistant de révision qui ne répond qu'avec vos propres documents.", "A revision assistant that answers only from your own documents."],["E-mail", "Email"],["Entrez votre adresse e-mail", "Enter your email address"],["Votre mot de passe", "Your password"],["Continuer", "Continue"],["OU", "OR"],["Créer un compte", "Create an account"],["J'ai déjà un compte", "I already have an account"],["Découvrir AKORI", "Discover AKORI"],["Comptes récents", "Recent accounts"],["Autre compte", "Other account"],["Une adresse réelle que vous consultez.", "A real address you check."],["Retapez le mot de passe", "Retype the password"],["Vos documents restent dans votre espace personnel. AKORI ne répond qu'à partir de vos cours.", "Your documents stay in your personal space. AKORI answers only from your courses."]);
   I18N.push(["Aucune activité pour le moment.", "No activity yet."],["Vos quiz, flashcards, colles orales, questions et résumés apparaîtront ici.", "Your quizzes, flashcards, orals, questions and summaries will appear here."],["Posez votre question…", "Ask your question…"],["Résumé généré", "Summary generated"],["Carte mentale générée", "Mind map generated"],["Question à l'assistant", "Question to the assistant"]);
+  I18N.push(["Titre du cours (facultatif)", "Course title (optional)"],["Ranger dans le module", "File into module"],["MON EXAMEN", "MY EXAM"],["Priorités du plan", "Plan priorities"],["Modifier le plan", "Edit plan"],["Voir calendrier complet", "See full calendar"],["Ajuster le temps", "Adjust time"],["Détails", "Details"],["Masquer", "Hide"],["Lancer la séance", "Start session"],["À faire", "To do"],["Planifiée", "Planned"],["Facultative", "Optional"],["En cours", "In progress"],["Fait", "Done"],["Temps par jour :", "Time per day:"],["Touchez un jour pour voir ses séances.", "Tap a day to see its sessions."],["Cours commencés", "Courses started"],["Séance faite", "Session done"],["Fermer", "Close"],["Séances", "Sessions"],["Pages", "Pages"],["Plan de révision", "Revision plan"],["Haute priorité", "High priority"],["Moyenne priorité", "Medium priority"],["Basse priorité", "Low priority"]);
   const EXACT = new Map(I18N.map(([fr, en]) => [fr.trim(), en]));
   const codeOf = (label) => /English/.test(String(label)) ? 'en' : 'fr';
   const labelOf = (code) => code === 'en' ? 'English' : 'Français';
@@ -6686,7 +6932,7 @@ AKORI_NAV_JS = r"""
     });
     if (!document.getElementById('login-wrap') || document.getElementById('login-wrap').offsetParent === null) document.querySelectorAll('#li-btn, #su-btn').forEach((b) => b.classList.remove('busy'));
     // Téléphone : le bouton d'import ouvre le gestionnaire de fichiers (PDF) et non la galerie
-    document.querySelectorAll('#add-document-tile input[type=file], #add-document-tile ~ input[type=file], input[type=file][accept*=".pdf"]').forEach((inp) => {
+    document.querySelectorAll('#documents-row input[type=file], #add-document-tile input[type=file], input[type=file][accept*=".pdf"]').forEach((inp) => {
       if (inp.accept !== 'application/pdf,.pdf') inp.accept = 'application/pdf,.pdf';
     });
   };
@@ -6728,6 +6974,56 @@ AKORI_NAV_JS = r"""
   };
   document.addEventListener('click', (e) => { const h = e.target.closest && e.target.closest('.gp-open'); if (h) gpOpen(h); });
   document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.gp-open')) { e.preventDefault(); gpOpen(e.target); } });
+  // Plan de révision intelligent : cartes cliquables (détails, lancer, calendrier, temps, modifier)
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest ? e.target : null;
+    if (!t) return;
+    const card = t.closest('.pl-card');
+    if (t.closest('.pl-cancel')) { document.body.classList.remove('plan-editing'); return; }
+    if (!card) return;
+    if (t.closest('.pl-showall')) { t.closest('.pl-grid').classList.add('all'); return; }
+    const det = t.closest('.pl-det');
+    if (det) { const task = det.closest('.pl-task'); task.classList.toggle('open'); det.textContent = task.classList.contains('open') ? 'Masquer' : 'Détails'; return; }
+    const go = t.closest('.pl-go');
+    if (go) {
+      const m = go.className.match(/ak-t-(\w+)/);
+      const doc = go.dataset.doc || '';
+      const sel = document.querySelector('#doc-select input');
+      if (doc && !(sel && sel.value === doc)) sendHidden('plan-go-box', 'plan-go-btn', doc);
+      const nav = m && document.getElementById('nav-' + m[1]);
+      window.setTimeout(() => { if (nav) nav.click(); window.scrollTo({ top: 0, behavior: 'smooth' }); }, doc ? 260 : 0);
+      return;
+    }
+    if (t.closest('.pl-edit')) {
+      document.body.classList.add('plan-editing');
+      const f = document.getElementById('plan-form-col'); if (f) window.setTimeout(() => f.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+      return;
+    }
+    if (t.closest('.pl-cal-t')) { card.classList.toggle('cal-open'); card.classList.remove('adj-open'); if (card.classList.contains('cal-open')) card.querySelector('.pl-cal').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+    if (t.closest('.pl-adj-t')) { card.classList.toggle('adj-open'); card.classList.remove('cal-open'); return; }
+    const mins = t.closest('.pl-mins');
+    if (mins) { card.querySelectorAll('.pl-mins').forEach((b) => b.classList.toggle('on', b === mins)); sendHidden('plan-min-box', 'plan-min-btn', mins.dataset.m + ':' + Date.now()); return; }
+    const cd = t.closest('.pl-cd');
+    if (cd && !cd.classList.contains('pl-cd-x')) {
+      card.querySelectorAll('.pl-cd.sel').forEach((c) => c.classList.remove('sel')); cd.classList.add('sel');
+      const tpl = cd.querySelector('template'); const out = card.querySelector('.pl-cal-detail');
+      if (tpl && out) { out.innerHTML = ''; out.appendChild(tpl.content.cloneNode(true)); }
+    }
+  });
+  window.setInterval(() => {
+    document.body.classList.toggle('plan-ready', !!document.querySelector('#plan-view-col .pl-card'));
+    const sv = window.__akPlanSave;
+    if (sv) {
+      const st = document.getElementById('plan-status');
+      const msg = st ? (st.textContent || '').trim() : '';
+      const card = document.querySelector('#plan-view-col .pl-card');
+      if (card && (card !== sv.card || Date.now() - sv.t > 1500) && /^\s*(✅|Plan de révision mis à jour|Revision plan updated)/.test(msg)) { document.body.classList.remove('plan-editing'); window.__akPlanSave = null; }
+      else if (Date.now() - sv.t > 15000) window.__akPlanSave = null;
+    }
+  }, 300);
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('#plan-save')) window.__akPlanSave = { t: Date.now(), card: document.querySelector('#plan-view-col .pl-card') };
+  }, true);
   // Comptes récents sur l'écran de connexion (comme Messenger)
   const ACC_KEY = 'akori-accounts';
   const accLoad = () => { try { return JSON.parse(localStorage.getItem(ACC_KEY) || '[]'); } catch (e) { return []; } };
@@ -7736,17 +8032,19 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                         with gr.Row(elem_classes="ak-cols", equal_height=False):
                             with gr.Column(scale=3, min_width=300, elem_classes="ak-pane"):
                                 gr.HTML("<div class='pane-title'>Mes documents</div>")
+                                with gr.Row(elem_id="upload-opts"):
+                                    upload_title = gr.Textbox(label="Titre du cours (facultatif)", placeholder="Ex. : Réseaux — Chapitre 2", scale=3, min_width=200, elem_id="upload-title")
+                                    upload_mod = gr.Dropdown(label="Ranger dans le module", choices=_module_choices(), value="", scale=2, min_width=160, elem_id="upload-mod")
                                 with gr.Row(elem_id="documents-row", equal_height=True):
                                     docs_html = gr.HTML(documents_html_v16(doc_selector.value), scale=3)
                                     pdf_input = gr.UploadButton(
                                         "＋\nAjouter des PDF",
-                                        file_types=[".pdf"],
+                                        file_types=None,  # contrôle fait côté serveur (signature %PDF) : Android donne parfois des noms sans « .pdf »
                                         file_count="multiple",
                                         type="filepath",
                                         elem_id="add-document-tile",
                                         scale=1,
                                     )
-                                upload_mod = gr.Dropdown(label="Ranger les nouveaux PDF dans le module", choices=_module_choices(), value="", elem_id="upload-mod")
                                 upload_status = gr.Markdown("", elem_id="upload-status")
                                 course_info = gr.HTML(course_overview_html(doc_selector.value), elem_classes="akori-hidden")
                                 del_doc_box = gr.Textbox(elem_id="del-doc-box", elem_classes="akori-hidden", show_label=False, container=False)
@@ -7756,11 +8054,11 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                                 modules_box = gr.HTML(modules_html(doc_selector.value))
                                 with gr.Row(elem_id="module-row"):
                                     mod_name = gr.Textbox(label="Nouveau module", placeholder="Ex. : Réseaux", scale=3, elem_id="mod-name")
-                                    mod_sem = gr.Dropdown(label="Semestre", choices=SEMESTERS, value=SEMESTERS[0], scale=1, min_width=90, elem_id="mod-sem")
+                                    mod_sem = gr.Dropdown(label="Semestre", choices=SEMESTERS, value=SEMESTERS[0], scale=1, min_width=115, elem_id="mod-sem")
                                 mod_create = gr.Button("Créer le module", variant="primary", elem_id="mod-create")
                                 with gr.Row(elem_id="module-row2"):
                                     mod_pick = gr.Dropdown(label="Module du cours actif", choices=_module_choices(), value="", scale=3, elem_id="mod-pick")
-                                    mod_del = gr.Button("Supprimer", scale=1, min_width=90, elem_id="mod-del")
+                                    mod_del = gr.Button("Supprimer", scale=1, min_width=120, elem_id="mod-del")
                                 mod_status = gr.Markdown("", elem_id="mod-status")
 
                     with gr.Tab("Réviser", id="review") as tab_review:
@@ -7888,8 +8186,8 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
 
                     with gr.Tab("Plan de révision", id="plan") as tab_plan:
                         with gr.Row(elem_classes="ak-cols", equal_height=False):
-                            with gr.Column(scale=2, min_width=280, elem_classes="ak-pane"):
-                                gr.HTML("<div class='pane-title'>Mon examen</div>")
+                            with gr.Column(scale=2, min_width=280, elem_classes="ak-pane", elem_id="plan-form-col"):
+                                gr.HTML("<div class='pane-title'>Mon examen</div><button type='button' class='pl-cancel'>✕ Fermer</button>")
                                 plan_date = gr.Textbox(label="Date de l'examen", placeholder="AAAA-MM-JJ", elem_id="plan-date")
                                 plan_name = gr.Textbox(label="Intitulé (facultatif)", placeholder="Ex. : Partiel de réseaux", elem_id="plan-name")
                                 plan_scope = gr.Dropdown(label="Cours concernés", choices=_plan_scope_choices(), value="all", elem_id="plan-scope")
@@ -7898,8 +8196,12 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                                     plan_btn = gr.Button("Créer mon plan", variant="primary", elem_id="plan-save")
                                     plan_del = gr.Button("Supprimer", elem_id="plan-clear")
                                 plan_status = gr.Markdown("", elem_id="plan-status")
-                            with gr.Column(scale=3, min_width=300, elem_classes="ak-pane"):
+                            with gr.Column(scale=3, min_width=300, elem_classes="ak-pane", elem_id="plan-view-col"):
                                 plan_box = gr.HTML(plan_html())
+                                plan_min_box = gr.Textbox(elem_id="plan-min-box", elem_classes="akori-hidden", show_label=False, container=False)
+                                plan_min_btn = gr.Button("min", elem_id="plan-min-btn", elem_classes="akori-hidden")
+                                plan_go_box = gr.Textbox(elem_id="plan-go-box", elem_classes="akori-hidden", show_label=False, container=False)
+                                plan_go_btn = gr.Button("go", elem_id="plan-go-btn", elem_classes="akori-hidden")
 
                     with gr.Tab("Historique", id="history") as tab_history:
                         journal_box = gr.HTML(history_page_html())
@@ -7984,12 +8286,58 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                     quiz_state, quiz_index, quiz_validated, quiz_view_box, quiz_status, quiz_choice, quiz_answers, quiz_next,
                     summary_output]
 
-    def upload_many(files, lang=None, module_id=""):
-        """Un ou plusieurs PDF d'un coup, rangés dans le module choisi."""
+    def _prepare_pdf(path, title="", n=1, total=1):
+        """Vérifie que le fichier est bien un PDF (signature %PDF) et lui donne un nom propre.
+
+        Renvoie (chemin, None) ou (None, message d'erreur)."""
+        path = getattr(path, "name", path) or ""
+        base = os.path.basename(path)
+        try:
+            if not path or not os.path.isfile(path) or os.path.getsize(path) == 0:
+                return None, f"⚠️ « {base or 'fichier'} » est vide ou illisible."
+            with open(path, "rb") as fh:
+                head = fh.read(1024)
+        except OSError:
+            return None, f"⚠️ Impossible de lire « {base} »."
+        if b"%PDF" not in head:
+            return None, f"⚠️ « {base} » n'est pas un PDF valide."
+        clean = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", (title or "").strip())
+        clean = re.sub(r"\s+", " ", clean).strip(" .")[:80]
+        if clean:
+            name = clean + (f" ({n})" if total > 1 else "") + ".pdf"
+        else:
+            stem = base[:-4] if base.lower().endswith(".pdf") else base
+            stem = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", stem).strip(" .") or "document"
+            name = stem + ".pdf"
+        if name != base:
+            dst_dir = tempfile.mkdtemp(prefix="akori_up_")
+            dst = os.path.join(dst_dir, name)
+            shutil.copyfile(path, dst)
+            path = dst
+        return path, None
+
+    def upload_many(files, lang=None, module_id="", title=""):
+        """Un ou plusieurs PDF d'un coup, rangés dans le module choisi, avec un titre facultatif."""
+        try:
+            yield from _upload_many(files, lang, module_id, title)
+        except Exception as exc:  # jamais de message « ⏳ » bloqué : on affiche l'erreur
+            print("upload error:", repr(exc))
+            yield (f"⚠️ Import interrompu : {exc}",) + tuple([gr.update()] * (10 + REVISION_N))
+
+    def _upload_many(files, lang=None, module_id="", title=""):
         if not isinstance(files, (list, tuple)):
             files = [files] if files else []
-        total, done = len(files), []
-        for n, f in enumerate(files, 1):
+        title = (title or "").strip()
+        total, done, errors = len(files), [], []
+        if not total:
+            yield ("⚠️ Aucun fichier reçu. Réessayez avec un fichier PDF.",) + tuple([gr.update()] * (10 + REVISION_N))
+            return
+        for n, raw in enumerate(files, 1):
+            f, err = _prepare_pdf(raw, title, n, total)
+            if err:
+                errors.append(err)
+                yield (err,) + tuple([gr.update()] * (10 + REVISION_N))
+                continue
             last = None
             for out in upload_and_refresh(f, lang):
                 last = out
@@ -7997,15 +8345,24 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                 if total > 1 and isinstance(out[0], str):
                     out = (f"({n}/{total}) {msg}",) + tuple(out[1:])
                 yield out + (gr.update(),)
-            sel = os.path.basename(getattr(f, "name", f) or "")
+            sel = os.path.basename(f)
             if sel and sel in documents_db:
                 done.append(sel)
+                changed = False
+                if title:
+                    documents_db[sel]["title"] = title + (f" ({n})" if total > 1 else "")
+                    changed = True
                 if module_id and module_id in _space()["modules"]:
                     documents_db[sel]["module"] = module_id
+                    changed = True
+                if changed:
                     _save_history(sel)
-                    yield tuple([gr.update()] * 10 + [gr.update()] * REVISION_N) + (modules_html(sel),)
-        if done and total > 1:
-            yield (f"✅ {len(done)} document(s) importé(s) sur {total}.",) + tuple([gr.update()] * (9 + REVISION_N)) + (modules_html(done[-1]),)
+                    yield (gr.update(), gr.update(), documents_html_v16(sel), dashboard_html(sel), course_overview_html(sel),
+                           course_overview_html(sel), global_progress_html(sel), gr.update(), gr.update(), gr.update(),
+                           *([gr.update()] * REVISION_N), modules_html(sel))
+        if total > 1 or (errors and done):
+            msg = f"✅ {len(done)} document(s) importé(s) sur {total}." + (("  \n" + "  \n".join(errors)) if errors else "")
+            yield (msg,) + tuple([gr.update()] * (9 + REVISION_N)) + ((modules_html(done[-1]) if done else gr.update()),)
 
     # Retour immédiat dès la sélection du PDF, puis import par étapes (extraction, indexation par lots).
     upload_event = pdf_input.upload(
@@ -8013,11 +8370,11 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
         inputs=None, outputs=[upload_status], queue=False
     )
     upload_event.then(
-        upload_many, inputs=[pdf_input, lang_choice, upload_mod],
+        upload_many, inputs=[pdf_input, lang_choice, upload_mod, upload_title],
         outputs=[upload_status, doc_selector, docs_html, home_html, course_info,
                  review_cards, global_progress_output, progress_output, chatbot, history_box] + REVISION_OUT + [modules_box],
         queue=True, show_progress="hidden", concurrency_limit=3
-    )
+    ).then(lambda: "", None, upload_title, queue=False)
 
     def refresh_all(d, lang=None):
         return (dashboard_html(d), documents_html_v16(d), course_overview_html(d), course_overview_html(d),
@@ -8072,6 +8429,9 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
     tab_history.select(history_page_html, None, [journal_box], queue=False, show_progress="hidden")
     plan_btn.click(plan_save, [plan_date, plan_name, plan_scope, plan_minutes], [plan_box, plan_status], queue=False)
     plan_del.click(plan_clear, None, [plan_box, plan_status, plan_date, plan_name, plan_scope], queue=False)
+    plan_min_btn.click(plan_set_minutes, [plan_min_box], [plan_box, plan_minutes], queue=False, show_progress="hidden")
+    plan_go_btn.click(lambda d: gr.update(value=d) if d in documents_db else gr.update(), [plan_go_box], [doc_selector],
+                      queue=False, show_progress="hidden")
     mod_create.click(module_create, [mod_name, mod_sem, doc_selector], [mod_pick, mod_status, modules_box, mod_name], queue=False)
     mod_pick.input(module_assign, [doc_selector, mod_pick], [mod_status, modules_box], queue=False)
     mod_del.click(module_delete, [mod_pick, doc_selector], [mod_pick, mod_status, modules_box], queue=False)
