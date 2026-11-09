@@ -1,21 +1,25 @@
 \documentclass[12pt,a4paper,oneside]{report}
 
+% =========================================================================
+% PRÉAMBULE
+% =========================================================================
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[french]{babel}
+\usepackage[numbers,sort&compress]{natbib}  % avant babel (demandé par babel-french)
+\usepackage[english,french]{babel}  % français = langue principale (dernière)
 \usepackage{lmodern}
+\usepackage{microtype}
 \usepackage{geometry}
 \geometry{margin=2.5cm}
+
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{array,booktabs,longtable,tabularx}
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{amsmath}
-\usepackage{microtype}
 \usepackage[most]{tcolorbox}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage{hyperref}
+\usepackage{hyperref}  % toujours en dernier
 
 \hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,citecolor=black}
 \setlength{\parskip}{0.45em}
@@ -24,23 +28,13 @@
 \setlength{\tabcolsep}{4pt}
 \setlength{\emergencystretch}{2em}
 
-% ---------------------------------------------------------------------------
-% Valeurs à compléter (en rouge pour ne pas les oublier) et emplacements des
-% figures que l'auteure dessinera elle-même (flux, organigrammes, diagrammes).
-% ---------------------------------------------------------------------------
+% Valeurs encore à compléter : affichées en rouge pour ne pas les oublier.
 \newcommand{\aremplir}[1]{\textcolor{red}{[#1]}}
-\newcommand{\emplacement}[3]{%
-  \begin{figure}[H]\centering
-  \fbox{\parbox[c][6.5cm][c]{0.9\textwidth}{\centering\small
-    \textbf{Emplacement réservé}\\[6pt]#3}}
-  \caption{#2}\label{#1}
-  \end{figure}}
 
 \begin{document}
 
 % =========================================================================
 % PAGE DE GARDE
-% (préambule : \usepackage{graphicx} et \usepackage[most]{tcolorbox})
 % =========================================================================
 \newgeometry{top=1.4cm,bottom=1.6cm,left=2cm,right=2cm}
 \begin{titlepage}
@@ -90,7 +84,7 @@
 \vfill
 {\large Présenté par : \textbf{Nomeniavo Edm-Johana RAFALIMANANA}\par}
 \vspace{0.35cm}
-{\normalsize Soutenu publiquement le : [Date de soutenance]\par}
+{\normalsize Soutenu publiquement le : \aremplir{date de soutenance}\par}
 
 % --- Jury (pas de ligne vide dans le tableau : elle décale les colonnes)
 \vfill
@@ -98,9 +92,9 @@
 \vspace{0.35cm}
 {\large
 \begin{tabular}{@{}l@{\quad:\quad}l@{\qquad}l@{}}
-  Président  & Monsieur [Nom et Prénoms]        & [Grade] \\[5pt]
-  Rapporteur & Monsieur/Madame [Nom et Prénoms] & [Grade] \\[5pt]
-  Encadreur  & Monsieur TSANGANDRAZANA Judicael & [Grade] \\
+  Président  & \aremplir{Nom et prénoms}        & \aremplir{Grade} \\[5pt]
+  Rapporteur & \aremplir{Nom et prénoms}        & \aremplir{Grade} \\[5pt]
+  Encadreur  & Monsieur TSANGANDRAZANA Judicael & \aremplir{Grade} \\
 \end{tabular}\par}
 
 \vfill
@@ -116,32 +110,59 @@
 \chapter*{Remerciements}
 \addcontentsline{toc}{chapter}{Remerciements}
 
-Je tiens à exprimer ma profonde gratitude à \aremplir{Titre, Prénom NOM}, mon encadrant, pour sa disponibilité, ses conseils et la confiance qu'il m'a accordée tout au long de ce projet.
+Avant tout développement de ce travail, nous tenons à exprimer notre profonde gratitude et nos sincères remerciements à toutes les personnes qui, de près ou de loin, ont contribué à la réalisation de ce projet de fin de cycle.
 
-Je remercie également l'ensemble de l'équipe pédagogique de la Licence Professionnelle en Génie Informatique de \aremplir{nom de l'établissement}, dont les enseignements ont fourni les bases nécessaires à la réalisation d'AKORI.
+Nous adressons tout d'abord nos remerciements les plus respectueux à la Direction de l'Institut Supérieur des Sciences et Technologies de Mahajanga (ISSTM), dirigée par Monsieur le Professeur MASINA Rufin, Directeur de l'ISSTM, ainsi qu'à l'ensemble du corps professoral de la mention Sciences et Techniques du Numérique et Physiques Appliquées, et plus particulièrement à l'équipe pédagogique de la Licence professionnelle en Génie Informatique. La qualité de leur enseignement, leur disponibilité et les connaissances transmises tout au long de notre parcours universitaire ont constitué des bases essentielles à la conception et à la réalisation de ce projet.
 
-Mes remerciements vont aussi aux étudiantes et étudiants qui ont accepté de tester l'application et dont les retours ont orienté de nombreuses améliorations, ainsi qu'aux membres du jury pour le temps consacré à l'évaluation de ce travail.
+Nous exprimons notre reconnaissance particulière à \textbf{Monsieur TSANGANDRAZANA Judicael}, notre encadreur, pour sa disponibilité, son accompagnement, ses précieux conseils et la confiance qu'il nous a accordée tout au long de ce travail. Ses orientations pertinentes, ses observations constructives et sa rigueur scientifique nous ont permis d'approfondir notre réflexion, de surmonter les difficultés rencontrées et d'améliorer progressivement la qualité de notre réalisation.
 
-Enfin, je remercie ma famille et mes proches pour leur soutien constant.
+Nous adressons également nos sincères remerciements aux étudiantes et étudiants qui ont accepté de participer aux essais de l'application \textbf{AKORI}. Leurs observations, leurs suggestions et leurs retours d'expérience ont été particulièrement précieux pour identifier certains points à améliorer et contribuer à l'évolution de la solution développée.
 
+Nos remerciements vont aussi aux membres du jury, qui nous font l'honneur d'évaluer ce travail. Nous leur sommes reconnaissants pour le temps consacré à l'examen de ce projet, ainsi que pour leurs remarques et suggestions, qui contribueront certainement à enrichir notre réflexion et à améliorer davantage cette réalisation.
+
+Enfin, nous exprimons notre profonde reconnaissance à notre famille, à nos proches et à nos camarades de promotion du parcours Génie Informatique pour leur soutien moral, leurs encouragements constants, leur patience et leur précieuse entraide tout au long de notre parcours universitaire et durant la réalisation de ce projet.
+
+À toutes ces personnes, nous adressons nos remerciements les plus sincères.
+
+% -------------------------------------------------------------------------
 \chapter*{Résumé}
 \addcontentsline{toc}{chapter}{Résumé}
 
-Les assistants conversationnels fondés sur l'intelligence artificielle générative donnent un accès immédiat à des explications, mais leurs réponses ne sont pas liées au cours réellement étudié et peuvent contenir des informations inventées (hallucinations). Ce projet présente AKORI (\emph{Assistant Knowledge Organized to Revise Intelligently}), un assistant de révision qui part des supports de cours de l'étudiant. Les documents PDF, y compris scannés grâce à une brique de reconnaissance optique de caractères, sont découpés page par page, vectorisés avec le modèle multilingue BGE-M3 et indexés dans FAISS. Pour chaque question, les passages les plus proches sont retrouvés ; si aucun n'atteint un seuil de similarité, AKORI indique que l'information ne figure pas dans le cours au lieu de faire générer une réponse. Sinon, le modèle Gemini rédige une réponse à partir de ces seuls passages et les pages utilisées sont affichées. Autour de ce cœur RAG, l'application propose un résumé, des flashcards, des quiz corrigés instantanément, une colle orale notée, une carte mentale, un plan de révision fondé sur la répétition espacée et un historique qui cartographie les lacunes et adapte le niveau des explications. Elle gère plusieurs utilisateurs, plusieurs cours regroupés en modules, et fonctionne sur ordinateur comme sur téléphone. Les mesures relevées par l'application montrent \aremplir{résultat principal : médiane du temps de réponse, taux de refus correct sur les questions hors cours}.
+L'évolution des technologies numériques et l'intégration de l'intelligence artificielle dans le domaine éducatif offrent de nouvelles possibilités pour accompagner les étudiants dans leurs apprentissages. Toutefois, l'exploitation de supports pédagogiques volumineux, la recherche d'informations pertinentes et la préparation des révisions demeurent des difficultés pour de nombreux apprenants. Face à ces contraintes, ce projet propose la conception et le développement d'AKORI (\emph{Assistant Knowledge Organized to Revise Intelligently}), un assistant intelligent destiné à faciliter la révision à partir des documents de cours des étudiants.
 
-\textbf{Mots-clés :} RAG, recherche sémantique, embeddings, BGE-M3, FAISS, Gemini, hallucination, révision, répétition espacée, OCR.
+AKORI repose sur une architecture de génération augmentée par récupération (RAG, \emph{Retrieval-Augmented Generation}), permettant de produire des réponses contextualisées à partir des informations contenues dans les documents fournis. Le traitement documentaire s'appuie sur PyMuPDF pour l'extraction du texte des fichiers PDF numériques et sur la reconnaissance optique de caractères (OCR) pour les documents numérisés. Le contenu extrait est ensuite découpé en fragments textuels afin de faciliter son exploitation. Ces fragments sont transformés en représentations vectorielles à l'aide du modèle BGE-M3, puis indexés avec FAISS pour permettre la recherche sémantique des passages pertinents. Les informations récupérées sont enfin transmises au modèle de langage Gemini (\texttt{gemini-3.5-flash-lite}), qui les utilise comme contexte pour générer des réponses adaptées aux questions de l'utilisateur.
 
+Au-delà de la recherche documentaire, AKORI propose plusieurs fonctionnalités pédagogiques, notamment la génération de résumés, de cartes mémoire (flashcards), de questionnaires à choix multiples (QCM), d'une colle orale notée, d'une carte mentale et d'un plan de révision, ainsi que le suivi de la progression par cours. Ces fonctionnalités visent à accompagner l'étudiant dans la compréhension des notions, la consolidation de la mémorisation, l'évaluation de ses connaissances et l'identification des points nécessitant un approfondissement.
+
+Ainsi, AKORI illustre l'apport de l'intelligence artificielle et de la recherche sémantique dans la conception d'un assistant de révision centré sur les supports pédagogiques de l'étudiant. Le projet a pour objectif de proposer un environnement de révision structuré, interactif et adapté aux besoins d'apprentissage, tout en maintenant un lien entre les contenus générés et les documents de référence.
+
+\vspace{0.5cm}
+\noindent\textbf{Mots-clés :} intelligence artificielle, RAG, OCR, BGE-M3, FAISS, recherche sémantique, assistant pédagogique, révision intelligente.
+
+% -------------------------------------------------------------------------
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
-Conversational assistants based on generative artificial intelligence give students instant explanations, but their answers are not tied to the course actually taught and may contain invented content (hallucinations). This project presents AKORI (\emph{Assistant Knowledge Organized to Revise Intelligently}), a revision assistant built on the student's own course material. PDF documents, including scanned ones thanks to an optical character recognition step, are split page by page, embedded with the multilingual BGE-M3 model and indexed with FAISS. For each question, the closest passages are retrieved; if none reaches a similarity threshold, AKORI states that the information is not in the course instead of generating an answer. Otherwise, the Gemini model writes an answer from these passages only, and the pages used are displayed. Around this RAG core, the application offers a summary, flashcards, instantly corrected quizzes, a graded oral examination, a mind map, a revision plan based on spaced repetition, and a history that maps knowledge gaps and adapts the level of explanations. It supports several users and several courses grouped into modules, on desktop and mobile. Measurements recorded by the application show \aremplir{main result}.
+\begin{otherlanguage}{english}
+The increasing use of digital learning resources has made course materials more accessible to students. However, understanding, organizing and effectively revising large volumes of educational content remain significant challenges. Students often spend considerable time searching for relevant information, identifying key concepts and preparing exercises to assess their knowledge.
 
-\textbf{Keywords:} RAG, semantic search, embeddings, BGE-M3, FAISS, Gemini, hallucination, revision, spaced repetition, OCR.
+To address these challenges, this project presents AKORI (\emph{Assistant Knowledge Organized to Revise Intelligently}), an artificial intelligence-based revision assistant designed to support students in their learning process through their own course documents.
+
+The system relies on a Retrieval-Augmented Generation (RAG) architecture to provide context-based answers using information extracted from uploaded PDF documents. Digital documents are processed with PyMuPDF, while scanned documents are handled through Optical Character Recognition (OCR). The extracted content is then split into smaller text passages, transformed into vector representations with BGE-M3 embeddings, and indexed with FAISS to enable semantic retrieval. The retrieved passages are then provided as context to the Gemini language model (\texttt{gemini-3.5-flash-lite}) to generate relevant answers.
+
+Beyond question answering, AKORI offers several learning-oriented features, including automatic summaries, flashcards, multiple-choice quizzes, a graded oral exam, a mind map, a revision plan and progress tracking. These features aim to help students understand course concepts, reinforce memorization, evaluate their knowledge and identify areas requiring further revision.
+
+AKORI shows how artificial intelligence and semantic retrieval can be combined to build a document-centered learning assistant. Its purpose is to provide students with a more structured, interactive and personalized revision experience while keeping a link between generated content and the educational materials provided.
+
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} artificial intelligence, Retrieval-Augmented Generation (RAG), Optical Character Recognition (OCR), BGE-M3, FAISS, semantic search, educational assistant, personalized learning.
+\end{otherlanguage}
 
 \tableofcontents
 \listoffigures
 \listoftables
 
+% -------------------------------------------------------------------------
 \chapter*{Liste des abréviations}
 \addcontentsline{toc}{chapter}{Liste des abréviations}
 
@@ -199,7 +220,7 @@ L'enseignement supérieur est concerné par cette évolution : la numérisation 
 
 L'émergence des assistants conversationnels fondés sur l'IA générative a renforcé cette situation. Un étudiant peut poser une question en langage naturel et obtenir presque instantanément une réponse structurée, une explication, un résumé ou une reformulation. Ces possibilités constituent une aide réelle dans le processus d'apprentissage lorsqu'elles sont utilisées comme outils complémentaires.
 
-Cependant, il faut distinguer obtenir une information et réviser un contenu d'enseignement précis. Réviser un cours ne consiste pas simplement à rechercher une réponse générale sur internet ou à interroger une IA sur un sujet donné. Réviser, c'est reprendre, comprendre, mémoriser et maîtriser les notions présentées dans un cadre pédagogique déterminé. Le contenu étudié doit rester cohérent avec la terminologie, les exemples et le niveau de détail retenus dans le support utilisé en classe.
+Cependant, il faut distinguer obtenir une information et réviser un contenu d'enseignement précis. Réviser un cours ne consiste pas simplement à rechercher une réponse générale sur Internet ou à interroger une IA sur un sujet donné. Réviser, c'est reprendre, comprendre, mémoriser et maîtriser les notions présentées dans un cadre pédagogique déterminé. Le contenu étudié doit rester cohérent avec la terminologie, les exemples et le niveau de détail retenus dans le support utilisé en classe.
 
 Pour un étudiant, le support pédagogique est une référence essentielle. Un même concept peut être expliqué de plusieurs manières selon le cours, l'enseignant ou le programme. Une réponse générée à partir de connaissances générales peut être correcte sur le plan théorique tout en étant différente de la manière dont la notion a été présentée dans le cours. Cette différence pose problème lors de la préparation d'un examen, où l'étudiant doit maîtriser les connaissances correspondant au programme effectivement étudié.
 
@@ -307,7 +328,7 @@ Le périmètre se résume autour de quatre axes : la gestion des supports pédag
 
 \section{Cadre académique du projet}
 
-Le projet AKORI s'inscrit dans le cadre des travaux de fin d'études réalisés en vue de l'obtention du diplôme de Licence Professionnelle en Génie Informatique. Cette réalisation permet de mettre en application les connaissances théoriques et pratiques acquises au cours de la formation dans un projet informatique concret.
+Le projet AKORI s'inscrit dans le cadre des travaux de fin d'études réalisés en vue de l'obtention du diplôme de Licence professionnelle en Génie Informatique. Cette réalisation permet de mettre en application les connaissances théoriques et pratiques acquises au cours de la formation dans un projet informatique concret.
 
 Le travail s'inscrit dans le contexte de l'intégration progressive des technologies numériques dans l'enseignement supérieur. Les établissements disposent aujourd'hui d'une quantité importante de supports pédagogiques numériques, tandis que les outils d'IA générative offrent de nouvelles possibilités de traitement de l'information. Cette évolution crée un contexte favorable à la conception de solutions informatiques destinées à accompagner les étudiants dans leurs activités d'apprentissage et de révision.
 
@@ -352,7 +373,7 @@ Les premiers tests avec un LLM exécuté localement (Qwen 2.5 7B sur un GPU T4 d
 
 L'interface Gradio a été entièrement personnalisée (CSS et scripts) : thème clair par défaut avec bascule vers un thème sombre, icônes vectorielles, traduction français/anglais, page de présentation avant la connexion, version adaptée au téléphone. La gestion des comptes (inscription, connexion mémorisée, profil, console d'administration) et l'isolation des données de chaque utilisateur ont été développées. Pour chaque question, l'application enregistre le temps de recherche, le temps jusqu'au premier mot et le temps total ; la console d'administration en affiche les médianes.
 
-L'ensemble du code est versionné sous Git sur un dépôt GitHub. Après plusieurs restructurations, l'application tient dans un seul fichier Python (\texttt{akori.py}), accompagné d'un fichier de dépendances et d'un fichier Docker pour le déploiement.
+L'ensemble du code est versionné avec Git et disponible sur le \href{https://github.com/rafalimanananomeniavoedmjohana-bit/AKORI.git}{dépôt GitHub du projet AKORI}. Après plusieurs restructurations, l'application tient dans un seul fichier Python (\texttt{akori.py}), accompagné d'un fichier de dépendances et d'un fichier Docker pour le déploiement.
 
 \section{Démarche de réalisation}
 
@@ -366,7 +387,12 @@ La conduite du projet s'est appuyée sur une démarche itérative, combinant ana
 
 \textbf{Réajustements.} Les mesures ont conduit au passage à l'API Gemini, à la simplification du pipeline de génération en un seul appel, à l'ajout de mécanismes de résilience, puis à l'enrichissement fonctionnel (OCR, fonctions de révision, plan, modules, historique) et au déploiement multiplateforme.
 
-\emplacement{fig:gantt}{Planning de réalisation du projet (diagramme de Gantt)}{Diagramme de Gantt : analyse du besoin, prototype local (Qwen), pipeline RAG, passage à l'API Gemini, fonctions de révision, OCR, plan de révision et modules, interface et version mobile, tests et évaluation, rédaction.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.98\textwidth]{images/p.png}
+  \caption{Planning de réalisation du projet (diagramme de Gantt)}
+  \label{fig:gantt}
+\end{figure}
 
 \section{Choix techniques}
 
@@ -611,9 +637,11 @@ Pour des vecteurs normalisés, les deux mesures sont liées : $\cos(u,v) = 1 - \
 
 La figure~\ref{fig:lexical} compare la recherche lexicale et la recherche sémantique dans le contexte universitaire.
 
-\begin{figure}[H]\centering
-\includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_05.jpg}
-\caption{Recherche lexicale et recherche sémantique}\label{fig:lexical}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_05.jpg}
+  \caption{Recherche lexicale et recherche sémantique}
+  \label{fig:lexical}
 \end{figure}
 
 \subsection{Modèles de langage à grande échelle et défi des hallucinations}
@@ -657,11 +685,13 @@ FAISS (recherche) & Extrait les $k$ passages les plus proches de la question & N
 Gemini (génération) & Synthétise le contexte et formule une explication & N'a pas accès directement aux documents de l'étudiant \\ \hline
 \end{longtable}
 
-FAISS ne peut pas rédiger, et Gemini ne connaît pas les cours de l'étudiant : cette complémentarité est le fondement de l'architecture d'AKORI.
+FAISS ne peut pas rédiger, et Gemini ne connaît pas les cours de l'étudiant : cette complémentarité est le fondement de l'architecture d'AKORI (figure~\ref{fig:vectoriel}).
 
-\begin{figure}[H]\centering
-\includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_02.png}
-\caption{Principe de la représentation vectorielle et de la recherche sémantique}\label{fig:vectoriel}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_02.png}
+  \caption{Principe de la représentation vectorielle et de la recherche sémantique}
+  \label{fig:vectoriel}
 \end{figure}
 
 \subsubsection*{D. Découpage documentaire}
@@ -682,9 +712,11 @@ Trois approches ont été considérées pour stocker les représentations vector
   \item \textbf{Bibliothèques d'indexation locales (FAISS).} Développée par Meta AI Research, FAISS est une bibliothèque C++ (avec liaisons Python) optimisée pour la recherche de plus proches voisins dans des collections de vecteurs denses \cite{johnson2021faiss,douze2024faiss}. L'index est chargé dans la mémoire du processus applicatif ; les calculs utilisent des instructions vectorisées du processeur ou le GPU si disponible. Sans aller-retour réseau, la recherche parmi des milliers de fragments prend quelques millisecondes. La bibliothèque est open source (licence MIT) et ne génère aucun coût.
 \end{itemize}
 
-\begin{figure}[H]\centering
-\includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_03.jpg}
-\caption{Comparaison des paradigmes de recherche et de stockage}\label{fig:paradigmes}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_03.jpg}
+  \caption{Comparaison des paradigmes de recherche et de stockage}
+  \label{fig:paradigmes}
 \end{figure}
 
 \textbf{Synthèse.} Pour des cours de 5 à 300 pages, soit quelques centaines à quelques milliers de fragments, une base vectorielle distribuée constituerait une sur-ingénierie pénalisante en latence et en coût. FAISS, associé à BGE-M3, a donc été retenu : il permet de retrouver les fragments les plus proches de la requête tout en conservant l'index et ses métadonnées dans l'espace de l'utilisateur.
@@ -747,37 +779,57 @@ Les valeurs de ce tableau sont indicatives : elles dépendent du matériel, de l
 
 AKORI repose sur une architecture modulaire organisée autour d'un pipeline RAG. Chaque étape, depuis l'importation d'un PDF jusqu'à la restitution d'une réponse ou d'une activité de révision, est prise en charge par un composant spécialisé. Ce pipeline est entouré de modules applicatifs : gestion des comptes, fonctions pédagogiques, suivi de la progression et administration (figure~\ref{fig:orga-general}).
 
-\emplacement{fig:orga-general}{Organigramme général de l'architecture d'AKORI}{Organigramme général : interface Gradio (ordinateur et téléphone), gestion des comptes, pipeline d'indexation (PyMuPDF, OCR, découpage, BGE-M3, FAISS), pipeline de question (recherche, seuil, Gemini, sources), modules de révision (résumé, flashcards, quiz, colle orale, mindmap, plan), stockage par utilisateur (Google Drive ou disque du serveur), console d'administration.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{0rganigramme generale.png}
+  \caption{Organigramme général de l'architecture d'AKORI}
+  \label{fig:orga-general}
+\end{figure}
 
 Deux acteurs interagissent avec le système : l'étudiant et l'administrateur (figure~\ref{fig:cas-utilisation}).
 
-\emplacement{fig:cas-utilisation}{Diagramme des cas d'utilisation}{Étudiant : s'inscrire, se connecter, importer des PDF, organiser ses modules, poser une question, consulter les sources, épingler une réponse, générer un résumé, des flashcards, un quiz, une mindmap, passer une colle orale, créer un plan de révision, consulter sa progression et son historique, modifier son profil. Administrateur : consulter les comptes, activer ou désactiver un compte, réinitialiser un mot de passe, changer un rôle, tester Gemini, consulter les performances, sauvegarder les données.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{acteurs.png}
+  \caption{Diagramme des cas d'utilisation de la plateforme AKORI}
+  \label{fig:cas-utilisation}
+\end{figure}
+
+\begin{quote}
+\small
+\textbf{Description des rôles.}
+
+\textit{Étudiant :} s'inscrire, se connecter, importer des PDF, organiser ses modules, poser une question, consulter les sources, épingler une réponse, générer un résumé, des flashcards, un quiz, une mindmap, passer une colle orale, créer un plan de révision, consulter sa progression et son historique, modifier son profil.
+
+\textit{Administrateur :} consulter les comptes, activer ou désactiver un compte, réinitialiser un mot de passe, changer un rôle, tester Gemini, consulter les performances, sauvegarder les données.
+\end{quote}
 
 \section{Flux de données global}
 
 Le flux de données suit une chaîne de transformation continue : importation du document $\rightarrow$ extraction du texte (et OCR) $\rightarrow$ découpage $\rightarrow$ vectorisation $\rightarrow$ indexation ; puis, pour chaque question : vectorisation de la question $\rightarrow$ recherche $\rightarrow$ contrôle du seuil $\rightarrow$ génération $\rightarrow$ réponse avec ses sources (figure~\ref{fig:flux}).
 
-\emplacement{fig:flux}{Diagramme de flux de données d'AKORI}{Flux de données : PDF de l'étudiant $\rightarrow$ texte par page (PyMuPDF / OCR) $\rightarrow$ fragments + métadonnées (page, section) $\rightarrow$ vecteurs BGE-M3 $\rightarrow$ index FAISS (stockage utilisateur). Question $\rightarrow$ vecteur $\rightarrow$ $k = 4$ passages $\rightarrow$ seuil $\rightarrow$ prompt $\rightarrow$ Gemini $\rightarrow$ réponse + sources $\rightarrow$ historique et journal de révision.}
-
-\begin{figure}[H]\centering
-\includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_01.jpg}
-\caption{Composants techniques de l'architecture}\label{fig:composants}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{BGE-M3 Document Learning Pipeline-2026-10-29-234216.png}
+  \caption{Diagramme de flux de données d'AKORI}
+  \label{fig:flux}
 \end{figure}
-% À vérifier : cette ancienne figure ne doit plus montrer le pipeline à trois agents ni la recherche hybride.
 
-\section{Briques techniques}
+\begin{quote}
+\small
+\textbf{Détail du flux :} PDF de l'étudiant $\rightarrow$ texte par page (PyMuPDF / OCR) $\rightarrow$ fragments + métadonnées (page, section) $\rightarrow$ vecteurs BGE-M3 $\rightarrow$ index FAISS (stockage utilisateur). Question $\rightarrow$ vecteur $\rightarrow$ $k = 4$ passages $\rightarrow$ seuil $\rightarrow$ prompt $\rightarrow$ Gemini $\rightarrow$ réponse + sources $\rightarrow$ historique et journal de révision.
+\end{quote}
 
-\subsection{Interface utilisateur (Gradio)}
+\section{Architecture fonctionnelle et pipeline détaillé}
 
-Gradio constitue la couche de présentation. Écrit en Python, il relie directement les composants graphiques aux fonctions de traitement, sans couche d'API REST distincte \cite{abid2019gradio,gradiodoc}. Il prend en charge l'affichage progressif des réponses (\emph{streaming}). L'interface a été personnalisée par des feuilles de style et des scripts : navigation latérale, icônes vectorielles, thème clair ou sombre, traduction française et anglaise, page de présentation avant la connexion et mise en page dédiée au téléphone.
+Le schéma ci-dessous détaille l'articulation entre la couche d'ingestion documentaire (PyMuPDF et OCR), la vectorisation BGE-M3, l'indexation FAISS, la recherche sémantique et les modules de révision (figure~\ref{fig:pipeline-detaille}).
 
-\subsection{Extraction du texte (PyMuPDF et OCR)}
-
-L'ingestion repose sur PyMuPDF \cite{pymupdfdoc}, plus rapide que pypdf ou pdfplumber. Le texte est extrait page par page. Lorsqu'une page contient moins de 20 caractères mais une image, elle est considérée comme scannée et transmise à l'OCR : Tesseract \cite{smith2007tesseract} en français et en anglais s'il est installé, sinon Gemini Vision. Au-delà de 80 pages scannées, les pages suivantes sont ignorées pour borner le temps de traitement.
-
-\subsection{Découpage structuré}
-
-Le découpeur \texttt{RecursiveCharacterTextSplitter} de LangChain applique une hiérarchie de séparateurs (paragraphes, lignes, phrases, mots) plutôt qu'un découpage brut qui couperait des mots ou des formules. Le découpage est effectué page par page (800 caractères, chevauchement de 80), et chaque fragment conserve son numéro de page et le titre de section détecté, utilisés ensuite pour citer les sources.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{diagramme de flux.png}
+  \caption{Architecture fonctionnelle détaillée et pipeline d'apprentissage d'AKORI}
+  \label{fig:pipeline-detaille}
+\end{figure}
 
 \subsection{Modèle d'embedding (BGE-M3)}
 
@@ -801,13 +853,57 @@ La recherche exacte (index plat) suffit pour quelques milliers de fragments et r
 
 L'API Gemini \cite{genaisdk} intervient à l'extrémité du pipeline. Elle reçoit un prompt contenant les passages numérotés et la question, et transforme ces extraits en explication pédagogique, sans dépasser le cadre des informations fournies. Le modèle principal est \texttt{gemini-3.5-flash-lite}, appelé via le SDK officiel \texttt{google-genai}, avec une chaîne de modèles de secours et les mécanismes de résilience décrits au chapitre~2. Les fonctions de révision utilisent des sorties JSON, vérifiées par l'application avant affichage.
 
+\section{Briques techniques}
+
+\subsection{Interface utilisateur (Gradio)}
+
+Gradio constitue la couche de présentation. Écrit en Python, il relie directement les composants graphiques aux fonctions de traitement, sans couche d'API REST distincte \cite{abid2019gradio,gradiodoc}. Il prend en charge l'affichage progressif des réponses (\emph{streaming}). L'interface a été personnalisée par des feuilles de style et des scripts : navigation latérale, icônes vectorielles, thème clair ou sombre, traduction française et anglaise, page de présentation avant la connexion et mise en page dédiée au téléphone.
+
+\subsection{Extraction du texte (PyMuPDF et OCR)}
+
+L'ingestion repose sur PyMuPDF \cite{pymupdfdoc}, plus rapide que pypdf ou pdfplumber. Le texte est extrait page par page. Lorsqu'une page contient moins de 20 caractères mais une image, elle est considérée comme scannée et transmise à l'OCR : Tesseract \cite{smith2007tesseract} en français et en anglais s'il est installé, sinon Gemini Vision. Au-delà de 80 pages scannées, les pages suivantes sont ignorées pour borner le temps de traitement.
+
+\subsection{Découpage structuré}
+
+Après l'extraction du contenu textuel des documents PDF, AKORI procède à une étape de segmentation appelée \emph{chunking}. Cette opération consiste à diviser le texte en plusieurs fragments de taille maîtrisée, appelés \emph{chunks}, afin de faciliter leur traitement et leur exploitation par les composants de recherche et de génération.
+
+Pour réaliser cette opération, le système utilise \texttt{RecursiveCharacterTextSplitter}, un outil proposé par la bibliothèque LangChain. Contrairement à une méthode de découpage strictement basée sur un nombre fixe de caractères, ce découpeur applique une hiérarchie de séparateurs afin de préserver autant que possible la cohérence du contenu.
+
+Le principe consiste à privilégier les séparations naturelles du texte. Le découpeur tente d'abord de diviser le contenu selon les limites des paragraphes. Si les fragments obtenus restent trop volumineux, il utilise des séparateurs plus fins, tels que les retours à la ligne, les espaces ou les caractères individuels. Cette approche récursive réduit les coupures inappropriées au milieu des phrases, des mots ou des unités de sens.
+
+Dans AKORI, le découpage est effectué page par page, ce qui conserve une correspondance entre les fragments générés et leur page d'origine. Cette organisation facilite la localisation des informations et limite le mélange de contenus provenant de pages différentes.
+
+Les paramètres de segmentation retenus sont les suivants :
+\begin{itemize}
+  \item \textbf{Taille des fragments : 800 caractères.} Cette limite permet de constituer des unités de texte suffisamment riches en informations, tout en évitant d'intégrer des passages trop volumineux dans les étapes ultérieures du traitement.
+  \item \textbf{Chevauchement : 80 caractères.} Ce chevauchement entre deux fragments successifs maintient une continuité contextuelle lorsque le contenu d'un paragraphe est réparti sur plusieurs fragments : certaines informations présentes à la fin d'un fragment sont reprises au début du suivant.
+\end{itemize}
+
+Le chevauchement joue un rôle important dans la préservation du contexte. Un découpage sans chevauchement pourrait séparer deux éléments d'une même explication et rendre un fragment moins compréhensible lorsqu'il est récupéré indépendamment des autres.
+
+Chaque fragment conserve par ailleurs des métadonnées permettant d'identifier son origine :
+\begin{itemize}
+  \item \textbf{le numéro de page}, qui permet de retrouver l'information dans le support original ;
+  \item \textbf{le titre de section}, détecté dans le document, qui apporte un contexte supplémentaire sur le sujet traité ;
+  \item \textbf{le texte du fragment}, qui sera utilisé pour calculer la représentation vectorielle.
+\end{itemize}
+
+Ces métadonnées assurent la traçabilité des informations : lorsqu'une question est posée, les passages retrouvés dans l'index vectoriel sont associés à leur page et à leur section, que le système affiche comme sources de sa réponse.
+
+Les fragments obtenus constituent ensuite les unités de base transmises au modèle d'embedding BGE-M3, qui transforme chacun d'eux en vecteur. Ces vecteurs sont enregistrés dans l'index FAISS afin de permettre la recherche sémantique lors des interactions avec l'utilisateur. Le découpage structuré représente ainsi une étape intermédiaire essentielle entre l'extraction documentaire et l'indexation vectorielle : il transforme un document parfois volumineux en unités textuelles faciles à rechercher, tout en préservant leur cohérence et leur provenance.
+
 \section{Traitements détaillés}
 
 \subsection{Indexation d'un document}
 
 L'importation d'un document suit les étapes suivantes (figure~\ref{fig:orga-indexation}) : contrôle de la taille (40 Mo maximum) ; calcul d'une empreinte du fichier, qui permet de réutiliser instantanément un document déjà indexé ; extraction du texte page par page avec OCR des pages scannées ; découpage ; vectorisation par lots de 64 fragments avec affichage de la progression ; construction de l'index FAISS ; enregistrement de l'index, des métadonnées et du PDF d'origine dans l'espace de l'utilisateur ; rangement éventuel dans un module.
 
-\emplacement{fig:orga-indexation}{Organigramme détaillé de l'indexation d'un document}{Début $\rightarrow$ fichier trop volumineux ? (oui : message, fin) $\rightarrow$ document déjà indexé (même empreinte) ? (oui : réutilisation, fin) $\rightarrow$ pour chaque page : texte suffisant ? (non + image : OCR Tesseract ou Gemini Vision) $\rightarrow$ texte exploitable ? (non : message, fin) $\rightarrow$ découpage (800/80, page, section) $\rightarrow$ embeddings par lots de 64 $\rightarrow$ index FAISS $\rightarrow$ enregistrement $\rightarrow$ module choisi ? $\rightarrow$ fin.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth,trim=0 0.8cm 0 0,clip]{FAISS.png}
+  \caption{Organigramme détaillé de l'indexation d'un document}
+  \label{fig:orga-indexation}
+\end{figure}
 
 \subsection{Traitement d'une question}
 
@@ -824,21 +920,37 @@ Le traitement d'une question (figures~\ref{fig:orga-question} et~\ref{fig:sequen
   \item \textbf{Secours} : si Gemini est indisponible malgré les modèles de secours, les passages les plus proches sont affichés directement.
 \end{enumerate}
 
-\emplacement{fig:orga-question}{Organigramme détaillé du traitement d'une question}{Question $\rightarrow$ réponse en cache ? (oui : affichage, fin) $\rightarrow$ portée (cours / module / espace) $\rightarrow$ vectorisation $\rightarrow$ recherche $k = 4$ $\rightarrow$ similarité max $\geq 0{,}30$ ? (non : message « ne figure pas dans le document », fin) $\rightarrow$ prompt (passages + question + consignes + niveau de l'élève) $\rightarrow$ Gemini disponible ? (non : modèle de secours ; échec : passages affichés, fin) $\rightarrow$ réponse en flux $\rightarrow$ sources $\rightarrow$ mesures et journal $\rightarrow$ fin.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.39\textwidth,trim=0 0.8cm 0 0,clip]{Passage.png}
+  \caption{Organigramme détaillé du traitement d'une question}
+  \label{fig:orga-question}
+\end{figure}
 
-\emplacement{fig:sequence}{Diagramme de séquence d'une question}{Acteurs : Étudiant, Interface Gradio, Moteur AKORI, BGE-M3, FAISS, API Gemini, Stockage. Messages : question $\rightarrow$ vectorisation $\rightarrow$ recherche des $k$ passages $\rightarrow$ contrôle du seuil $\rightarrow$ appel Gemini (streaming) $\rightarrow$ affichage progressif $\rightarrow$ sources $\rightarrow$ enregistrement de l'historique et des temps.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,trim=0.1cm 0.2cm 0.1cm 0.2cm,clip]{sequence_question.png}
+  \caption{Diagramme de séquence d'une question}
+  \label{fig:sequence}
+\end{figure}
 
 \subsection{Plan de révision intelligent}
 
-L'étudiant indique la date de son examen, la portée du plan (un cours, un module ou tous ses cours) et le temps disponible par jour. AKORI combine alors ses points faibles et une répétition espacée \cite{cepeda2006spacing} pour proposer un plan jour par jour (figure~\ref{fig:orga-plan}) :
+Le plan de révision est construit par un assistant en cinq étapes : contexte (examen, contrôle continu ou apprentissage libre), calendrier (date, temps disponible par jour et heure de début), matières (choisies parmi les PDF importés, avec les activités souhaitées), rythme (intensité et jours de repos) et fonctions d'intelligence (répétition espacée, priorisation, alertes de surcharge). AKORI combine alors les points faibles de l'étudiant et une répétition espacée \cite{cepeda2006spacing} pour produire un emploi du temps semaine par semaine (figure~\ref{fig:orga-plan}) :
 \begin{itemize}[nosep]
   \item \textbf{pages faibles} : pages associées aux questions de quiz ratées, aux flashcards marquées « À revoir » et aux points manqués en colle orale ;
-  \item \textbf{répétition espacée} : une activité réussie revient après 1, 3, 7 puis 14 jours ; un mauvais résultat la rapproche ;
-  \item \textbf{répartition} : les tâches (résumé, relecture de pages, flashcards, quiz, colle orale, revue finale) sont réparties dans le temps quotidien disponible, avec un jour de repos et une revue finale la veille de l'examen ;
+  \item \textbf{répétition espacée} : une activité réussie revient à intervalles croissants (1, 3, 7 puis 14 jours au rythme moyen) ; un mauvais résultat la rapproche ;
+  \item \textbf{répartition} : les séances (résumé, relecture de pages, flashcards, quiz, colle orale, revue finale) sont placées à l'heure dans le temps quotidien disponible, en évitant les jours de repos, avec une revue finale avant l'examen ;
+  \item \textbf{explication et alertes} : chaque séance indique pourquoi elle est proposée, et les journées qui dépassent le temps disponible sont signalées ;
   \item \textbf{recalcul} : le plan est recalculé automatiquement après chaque séance.
 \end{itemize}
 
-\emplacement{fig:orga-plan}{Organigramme du calcul et du recalcul du plan de révision}{Date d'examen, portée, minutes par jour $\rightarrow$ date passée ? (oui : message) $\rightarrow$ pour chaque cours : activités déjà faites et résultats, pages faibles $\rightarrow$ prochaine échéance (1, 3, 7, 14 jours ; rapprochée si échec) $\rightarrow$ répartition jour par jour selon le temps disponible, jour de repos, revue finale $\rightarrow$ affichage $\rightarrow$ nouvelle séance terminée $\rightarrow$ recalcul.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,trim=0.1cm 0.2cm 0.1cm 0.2cm,clip]{Organigramme du plan de révision AKORI.png}
+  \caption{Organigramme du plan de révision}
+  \label{fig:orga-plan}
+\end{figure}
 
 \section{Fonctionnalités pédagogiques}
 
@@ -858,6 +970,8 @@ Ces fonctions s'appuient sur l'effet de test, qui montre que la récupération a
 
 \section{Comptes, administration et sécurité}
 
+Le parcours d'un utilisateur dans l'application est présenté à la figure~\ref{fig:parcours}.
+
 \begin{itemize}
   \item \textbf{Comptes} : inscription par adresse e-mail, connexion mémorisée par jeton, accueil en quatre étapes (prénom, niveau, objectif, langue), profil avec photo.
   \item \textbf{Adresses e-mail utilisables} : contrôle du format, détection des fautes de frappe courantes sur les domaines, refus des adresses jetables et vérification de l'existence du domaine.
@@ -866,7 +980,12 @@ Ces fonctions s'appuient sur l'effet de test, qui montre que la récupération a
   \item \textbf{Administration} : liste des comptes, activation, changement de rôle, mot de passe temporaire, test de la connexion à Gemini, médianes des temps de réponse, sauvegarde et maintenance des données. En déploiement public, aucun mot de passe administrateur par défaut n'est utilisé.
 \end{itemize}
 
-\emplacement{fig:parcours}{Parcours de l'utilisateur dans l'application}{Page de présentation $\rightarrow$ « Se connecter » $\rightarrow$ connexion ou création de compte (vérification de l'e-mail) $\rightarrow$ premier accès ? (oui : accueil en 4 étapes) $\rightarrow$ espace de révision (accueil, dossiers, révision, assistant, plan, historique\ldots) ou console d'administration selon le rôle $\rightarrow$ déconnexion.}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,trim=0.1cm 0.2cm 0.1cm 0.2cm,clip]{images/Parcours utilisateur dans l’application AKORI.png}
+  \caption{Parcours utilisateur dans l'application}
+  \label{fig:parcours}
+\end{figure}
 
 \section{Déploiement et accès multiplateforme}
 
@@ -903,7 +1022,7 @@ Débit de génération & 5 à 15 jetons/s & Affichage fluide en flux & -- \\ \hl
 Réponse complète & 10 à 20 s & \aremplir{x} s (médiane), \aremplir{x} s (95\textsuperscript{e} centile) & \aremplir{réduction en \%} \\ \hline
 \end{longtable}
 
-\textbf{Mesures réalisées sur} \aremplir{n} \textbf{questions, du} \aremplir{date} \textbf{au} \aremplir{date}, \textbf{avec} \aremplir{environnement : Colab CPU/GPU ou serveur}.
+Mesures réalisées sur \aremplir{n} questions, du \aremplir{date} au \aremplir{date}, avec \aremplir{environnement : Colab CPU/GPU ou serveur}.
 
 \textbf{Résolution du goulot d'étranglement matériel.} L'exécution locale saturait la mémoire et le processeur lors des appels successifs. Le passage à l'API et à un appel unique déporte le calcul intensif et supprime les étapes intermédiaires.
 
@@ -913,9 +1032,11 @@ Réponse complète & 10 à 20 s & \aremplir{x} s (médiane), \aremplir{x} s (95\
 
 \textbf{Indexation.} \aremplir{temps d'indexation d'un PDF de n pages, sur CPU et sur GPU, avec et sans OCR}.
 
-\begin{figure}[H]\centering
-\includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_06.jpg}
-\caption{Comparaison des latences entre le prototype local et la version finale}\label{fig:latences}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_06.jpg}
+  \caption{Comparaison des latences entre le prototype local et la version finale}
+  \label{fig:latences}
 \end{figure}
 
 \section{Évaluation qualitative et traitement des hallucinations}
@@ -990,21 +1111,92 @@ Ce projet a été l'occasion de passer d'une logique d'assemblage de code à une
 
 La version actuelle d'AKORI répond aux objectifs fixés : exploitation des supports PDF (y compris scannés), recherche sémantique avec contrôle de pertinence, génération de contenus pédagogiques, organisation en modules et suivi personnalisé. Plusieurs évolutions peuvent néanmoins être envisagées pour améliorer sa fiabilité, ses performances et son accompagnement. La figure~\ref{fig:feuille-route} en présente la feuille de route.
 
-\begin{figure}[H]\centering
-\includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_04.png}
-\caption{Feuille de route des évolutions envisagées}\label{fig:feuille-route}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth,height=0.6\textheight,keepaspectratio]{images/image_04.png}
+  \caption{Feuille de route des évolutions envisagées}
+  \label{fig:feuille-route}
 \end{figure}
 
 \section{Amélioration du traitement documentaire}
 
-L'efficacité d'AKORI dépend de la qualité du texte extrait. La brique OCR actuelle pourrait être renforcée :
-\begin{itemize}[nosep]
-  \item \textbf{prétraitement des images} : redressement, réduction du bruit, amélioration du contraste lorsque le document le justifie ;
-  \item \textbf{analyse de la mise en page} : distinguer titres, paragraphes, tableaux, légendes et colonnes pour préserver la structure logique ;
-  \item \textbf{contenus complexes} : solutions spécialisées pour les formules mathématiques et les expressions scientifiques ;
-  \item \textbf{contrôle de qualité} : signaler à l'utilisateur les pages dont le texte extrait est vide ou dégradé ;
-  \item \textbf{traitement en arrière-plan} : indexer les longs documents sans bloquer l'interface.
+L'efficacité d'AKORI dépend directement de la qualité des informations extraites des supports pédagogiques importés par les utilisateurs. Les étapes suivantes de la chaîne de traitement, notamment le découpage des documents, la vectorisation avec BGE-M3 et la recherche sémantique avec FAISS, reposent sur un texte suffisamment complet, lisible et correctement structuré.
+
+Dans sa version actuelle, AKORI exploite PyMuPDF pour récupérer le contenu textuel des documents PDF numériques et utilise la reconnaissance optique de caractères (OCR) pour les documents numérisés. Bien que cette approche prenne en charge différentes catégories de documents, certaines difficultés peuvent encore affecter la qualité de l'extraction, particulièrement lorsque les fichiers présentent une mauvaise résolution, une mise en page complexe ou des contenus scientifiques spécifiques. Plusieurs améliorations peuvent ainsi être envisagées.
+
+\subsection{Prétraitement des images avant reconnaissance OCR}
+
+La qualité de la reconnaissance optique de caractères dépend fortement de l'état des images soumises au moteur OCR. Un document numérisé peut contenir des pages inclinées, des zones sombres, du bruit visuel ou un contraste insuffisant, qui entraînent des erreurs de reconnaissance, des caractères manquants ou des mots mal interprétés.
+
+Une première amélioration consisterait à intégrer une étape de prétraitement des images avant leur transmission au moteur OCR :
+\begin{itemize}
+  \item \textbf{le redressement des pages}, pour corriger l'inclinaison des documents et rendre les lignes de texte horizontales ;
+  \item \textbf{la réduction du bruit}, pour éliminer les taches et imperfections dues à la numérisation tout en préservant les caractères ;
+  \item \textbf{l'amélioration du contraste}, lorsque la différence entre le texte et l'arrière-plan est insuffisante ;
+  \item \textbf{la binarisation}, qui transforme l'image en noir et blanc pour mieux distinguer les caractères du fond.
 \end{itemize}
+
+Ces opérations pourraient être réalisées avec une bibliothèque de traitement d'images comme OpenCV. Leur application devrait rester conditionnelle à la qualité initiale du document, car un prétraitement excessif peut aussi supprimer des détails utiles à la reconnaissance.
+
+\subsection{Analyse et préservation de la structure des documents}
+
+L'extraction du texte ne consiste pas uniquement à récupérer des caractères : il est également important de conserver l'organisation logique du document. Un support pédagogique peut comporter des titres, des sous-titres, des paragraphes, des tableaux, des légendes ou des colonnes. Une extraction linéaire qui ignore cette organisation peut mélanger des informations provenant de différentes zones d'une même page.
+
+Une amélioration envisageable serait d'intégrer une analyse de la mise en page (\emph{layout analysis}), qui identifie les différentes zones du document et leur nature avant de reconstituer l'ordre logique du contenu. Les titres seraient reconnus comme éléments de structure, les paragraphes regroupés par section et les tableaux conservés sous forme structurée ; pour les documents à plusieurs colonnes, les erreurs d'ordre de lecture seraient limitées. Cette structure faciliterait le découpage en fragments cohérents et améliorerait l'association des passages avec leurs chapitres.
+
+\subsection{Prise en charge des contenus mathématiques et scientifiques}
+
+Les supports utilisés dans les formations scientifiques et informatiques contiennent des formules, des équations, des symboles et des notations techniques. Les moteurs OCR classiques, conçus pour du texte ordinaire, interprètent mal les fractions, exposants, indices ou racines.
+
+Une perspective consisterait à intégrer des outils spécialisés dans la reconnaissance des formules, capables de convertir les expressions visuelles en représentations structurées, notamment au format LaTeX. Cette représentation conserverait la structure des formules et éviterait des pertes d'information, ce qui rendrait AKORI mieux adapté aux cours de mathématiques, de physique et d'informatique.
+
+\subsection{Mise en place d'un contrôle de qualité de l'extraction}
+
+Certaines pages peuvent ne produire aucun texte exploitable (mauvaise numérisation, contenu uniquement graphique), d'autres un texte partiellement reconnu. Pour éviter d'indexer des données dégradées, AKORI pourrait analyser plusieurs indicateurs :
+\begin{itemize}
+  \item le nombre de caractères extraits sur chaque page ;
+  \item la présence de pages entièrement vides ;
+  \item la proportion de caractères inhabituels ou mal reconnus ;
+  \item la cohérence générale du texte obtenu.
+\end{itemize}
+
+À partir de ces indicateurs, le système attribuerait un état de qualité à chaque page, signalerait à l'utilisateur les pages à vérifier et pourrait proposer une nouvelle extraction ou l'importation d'une version de meilleure qualité. Le traitement documentaire deviendrait ainsi plus transparent, et le risque de transmettre des informations incorrectes à BGE-M3 et à FAISS serait réduit.
+
+\subsection{Traitement en arrière-plan des documents volumineux}
+
+L'indexation d'un document volumineux enchaîne plusieurs opérations coûteuses : extraction, segmentation, calcul des embeddings et construction de l'index. Exécutées dans le processus principal, elles peuvent ralentir l'interface.
+
+Un traitement asynchrone en arrière-plan permettrait de poursuivre la révision pendant l'indexation, avec un état d'avancement pour chaque document :
+\begin{itemize}
+  \item document reçu ;
+  \item extraction du contenu en cours ;
+  \item segmentation du texte ;
+  \item calcul des représentations vectorielles ;
+  \item indexation dans FAISS ;
+  \item document prêt pour la révision.
+\end{itemize}
+
+\subsection{Synthèse des améliorations envisagées}
+
+Le tableau~\ref{tab:amelioration-documentaire} résume les évolutions proposées pour le traitement documentaire.
+
+\begin{table}[H]
+  \centering
+  \caption{Synthèse des perspectives d'amélioration du traitement documentaire}
+  \label{tab:amelioration-documentaire}
+  \renewcommand{\arraystretch}{1.4}
+  \begin{tabularx}{\textwidth}{|p{3.2cm}|X|X|}
+    \hline
+    \textbf{Axe d'amélioration} & \textbf{Principe technique} & \textbf{Bénéfice attendu} \\ \hline
+    Prétraitement des images & Redressement, réduction du bruit et amélioration du contraste. & Améliorer la qualité de la reconnaissance OCR. \\ \hline
+    Analyse de la mise en page & Identification des titres, paragraphes, tableaux et colonnes. & Préserver la structure logique des documents. \\ \hline
+    Contenus scientifiques & Reconnaissance spécialisée des formules et expressions mathématiques. & Réduire les pertes d'informations scientifiques. \\ \hline
+    Contrôle de qualité & Analyse des pages vides, des caractères incorrects et du texte dégradé. & Détecter les problèmes d'extraction avant l'indexation. \\ \hline
+    Traitement en arrière-plan & Exécution asynchrone de l'extraction et de l'indexation. & Améliorer la fluidité de l'interface et la gestion des documents volumineux. \\ \hline
+  \end{tabularx}
+\end{table}
+
+Ces améliorations renforceraient la première étape de la chaîne, sur laquelle reposent la recherche documentaire et la génération des contenus pédagogiques. Elles devront toutefois être évaluées séparément avant leur intégration, en tenant compte du coût des traitements, du temps d'exécution et des ressources matérielles disponibles.
 
 \section{Recherche hybride et réordonnancement}
 
@@ -1031,13 +1223,17 @@ Ces appréciations sont des tendances générales, non des résultats mesurés s
 
 \section{Personnalisation et évaluation de l'apprentissage}
 
-Le plan de révision et la carte des lacunes constituent une première personnalisation. Ils pourraient évoluer vers :
-\begin{itemize}[nosep]
-  \item un ajustement progressif de la difficulté des quiz selon le niveau observé ;
-  \item des recommandations explicables, fondées sur des indicateurs clairement définis ;
-  \item un filtrage des recherches par chapitre ;
-  \item une évaluation automatique de la fidélité des réponses aux passages récupérés.
-\end{itemize}
+Le plan de révision et la carte des lacunes constituent une première approche de personnalisation de l'apprentissage dans AKORI. Ces éléments organisent les activités de révision et mettent en évidence les notions qui nécessitent davantage d'attention. Cette personnalisation pourrait être approfondie afin de proposer un accompagnement plus dynamique, qui s'adapte progressivement aux résultats et aux besoins de chaque étudiant.
+
+\textbf{Ajustement progressif de la difficulté des quiz.} Les résultats aux activités d'évaluation sont des indicateurs du niveau de compréhension. Lorsqu'un étudiant répond correctement à plusieurs questions sur une même notion, le système pourrait lui soumettre des questions plus complexes ; à l'inverse, en cas d'erreurs répétées, il proposerait des questions plus accessibles pour consolider les bases. Les exercices seraient ainsi mieux adaptés au niveau réel de l'apprenant.
+
+\textbf{Recommandations explicables.} Les recommandations devraient reposer sur des indicateurs clairement définis : taux de réussite aux quiz, nombre de réponses incorrectes, notions fréquemment révisées, activités non encore maîtrisées. Si un étudiant obtient régulièrement de faibles résultats sur un chapitre, AKORI pourrait lui recommander le résumé correspondant, les cartes mémoire associées ou un nouveau questionnaire, en expliquant l'origine de la suggestion.
+
+\textbf{Filtrage des recherches par chapitre.} Dans un cours composé de plusieurs chapitres, la recherche pourrait être limitée à une partie précise du document, choisie par l'étudiant. Le périmètre de recherche serait réduit, les informations mieux ciblées, et la préparation d'une évaluation portant sur un chapitre facilitée.
+
+\textbf{Évaluation automatique de la fidélité des réponses.} Dans une architecture RAG, la présence des passages dans le contexte du modèle ne garantit pas que chaque affirmation générée soit appuyée par les sources. Un mécanisme complémentaire pourrait comparer les affirmations d'une réponse aux passages récupérés, afin de détecter les informations insuffisamment justifiées ou absentes du support de cours.
+
+Ces évolutions feraient progresser AKORI d'un assistant proposant des activités de révision vers un système d'accompagnement plus personnalisé. Leur réalisation nécessitera des expérimentations pour définir des indicateurs pertinents, vérifier la fiabilité des recommandations et évaluer leur impact réel sur l'apprentissage, tout en préservant la transparence des réponses et la traçabilité des sources.
 
 \section{Sécurité, déploiement et autonomie}
 
@@ -1049,14 +1245,25 @@ Le plan de révision et la carte des lacunes constituent une première personnal
 
 \section{Conclusion des perspectives}
 
-Les perspectives d'AKORI s'inscrivent dans une démarche d'amélioration progressive : fiabiliser les données extraites, améliorer la sélection des passages et rendre l'accompagnement plus adapté à chaque étudiant. Ces travaux devront être conduits de manière expérimentale, en distinguant les fonctionnalités déjà opérationnelles des améliorations encore à valider, tout en conservant la traçabilité des sources et la maîtrise des contraintes de calcul, de disponibilité et de protection des données.
+Les perspectives d'évolution d'AKORI s'inscrivent dans une démarche d'amélioration progressive visant à renforcer la fiabilité du système, la pertinence des résultats générés et la qualité de l'accompagnement pédagogique.
+
+Le premier axe concerne le traitement documentaire : la qualité des réponses dépend en grande partie de la qualité du texte extrait. Le prétraitement des images, l'analyse de la mise en page et la reconnaissance des formules permettraient de mieux exploiter les documents numérisés ou complexes.
+
+Le deuxième axe porte sur la recherche documentaire. Une recherche hybride, combinant recherche sémantique et recherche lexicale, améliorerait la pertinence des passages pour les termes techniques, les acronymes et les références précises.
+
+Le troisième axe concerne la personnalisation : exploiter davantage les résultats des quiz, des flashcards et des colles orales pour identifier les notions maîtrisées et les difficultés récurrentes, et proposer des activités adaptées au rythme de chaque étudiant.
+
+Des améliorations techniques sont également envisageables : optimisation de l'indexation, traitement en arrière-plan, stockage persistant garantissant la conservation des documents, des index et de la progression dans un environnement en ligne.
+
+Enfin, l'évolution d'AKORI devra s'accompagner d'une évaluation expérimentale plus étendue, sur des supports, des disciplines et des profils d'étudiants plus variés, ainsi que d'une étude des conditions de protection des données personnelles et de disponibilité des services externes.
+
+Les perspectives d'AKORI ne consistent donc pas uniquement à ajouter de nouvelles fonctionnalités, mais surtout à améliorer progressivement la qualité, la fiabilité et la pertinence de celles qui existent déjà, selon une démarche expérimentale fondée sur des tests et des validations successives. L'objectif à long terme est de faire d'AKORI un assistant de révision fiable et accessible, capable de soutenir l'étudiant dans la compréhension, la mémorisation et la maîtrise de ses cours, tout en conservant le rôle central de l'apprentissage personnel et de l'accompagnement pédagogique.
 
 % =========================================================================
 % BIBLIOGRAPHIE
 % =========================================================================
 \clearpage
 \addcontentsline{toc}{chapter}{Bibliographie}
-\nocite{*}
 \bibliographystyle{unsrtnat}
 \bibliography{references}
 
