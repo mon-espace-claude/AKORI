@@ -5874,13 +5874,6 @@ html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repe
 .home-fit .gc-body > span { font-size:12px!important;line-height:1.35!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 .home-fit .gc-chev { display:none; }
 /* détail du guide : fenêtre au centre de l'écran (la page ne s'allonge pas) */
-details.guide-card[open] { grid-column:auto!important; }
-details.guide-card[open]::before { content:"";position:fixed;inset:0;background:rgba(8,10,20,.55);z-index:400;backdrop-filter:blur(2px); }
-details.guide-card[open] > .gc-detail { position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:401;width:min(560px,92vw);max-height:84vh;overflow:auto;
-  background:var(--ak-card);border:1px solid var(--ak-line);border-radius:20px;padding:22px 24px 20px!important;box-shadow:0 30px 80px rgba(0,0,0,.35);animation:akrise .25s ease both; }
-details.guide-card[open] > summary { position:relative;z-index:402;pointer-events:none; }
-.gc-close { position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid var(--ak-line);background:var(--ak-soft);color:var(--ak-text);cursor:pointer;font-size:16px;line-height:1; }
-.gc-detail-title { font-size:18px;font-weight:800;color:var(--ak-text);margin:0 30px 10px 0; }
 .home-foot { display:flex;align-items:center;justify-content:center;gap:10px;color:var(--ak-muted);font-size:12.5px;font-style:italic;text-align:center;padding:2px 0; }
 .home-foot img { width:22px;height:22px;border-radius:7px; }
 @media (max-width:1100px) { html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(3,minmax(0,1fr))!important; } }
@@ -5930,7 +5923,6 @@ html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repe
 @media (max-width:1250px) { html:root:root:root:root body .home-fit .guide-grid { grid-template-columns:repeat(4,minmax(0,1fr))!important; } }
 .hero-compact .hero-art { max-height:118px!important; }
 .home-fit .hero-compact .eyebrow { font-size:9.5px; }
-html:root:root:root:root body details.guide-card[open], html:root:root:root:root body details.guide-card[open]:hover { overflow:visible!important;transform:none!important;animation:none!important; }
 html:root:root:root:root body .quiz-card { padding:16px 20px!important; }
 html:root:root:root:root body .quiz-card h2 { margin:8px 0 10px!important;font-size:18px!important; }
 html:root:root:root:root body .quiz-card .option { padding:9px 12px!important;margin:6px 0!important; }
@@ -5970,7 +5962,6 @@ html:root:root:root:root body.in-app #assistant-chatbot { height:calc(var(--body
 html:root:root:root:root body .ak-pane > * { flex-shrink:0!important; }
 .home-fit .gc-body > span { display:none!important; }
 .home-fit .gc-body b { white-space:normal!important;overflow:visible!important; }
-html:root:root:root:root body details.guide-card[open] > summary { z-index:auto!important;position:static!important; }
 
 #scope-row { flex-wrap:nowrap!important;gap:8px!important; } #scope-row > * { flex:0 0 auto!important;width:auto!important; }
 html:root:root:root:root body .ak-pane .global-metrics { grid-template-columns:1fr 1fr!important; }
@@ -6694,6 +6685,64 @@ body > .edt-modal { position:fixed;inset:0;z-index:700;display:flex;align-items:
 .ed-day em { font-style:normal;font-size:.75rem;font-weight:700;color:var(--ak-muted, #69758b);font-variant-numeric:tabular-nums;grid-row:span 2; }
 .ed-day span { font-size:.84rem;color:var(--ak-text, #182033); } .ed-day small { font-size:.72rem;color:var(--ak-muted, #69758b); }
 .ed-acts:empty { display:none; } .ed-acts .pl-go { width:100%;padding:.7rem!important;font-size:.88rem!important;border-radius:.8rem!important; }
+
+/* ===== Accueil : fiche du guide dans une fenêtre centrée + animations d'entrée qui laissent agir le survol ===== */
+html:root:root:root:root body .rv, html:root:root:root:root body .mini-stat, html:root:root:root:root body .hero { animation-fill-mode:backwards!important; }
+html:root:root:root:root body details.guide-card { transition:transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, border-color .22s ease!important; will-change:transform; }
+html:root:root:root:root body details.guide-card:hover { transform:translateY(-3px); }
+html:root:root:root:root body details.guide-card:active { transform:translateY(-1px) scale(.99); }
+html:root:root:root:root body .mini-stat { transition:transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease; }
+body > .gc-modal { position:fixed;inset:0;z-index:650;display:flex;align-items:center;justify-content:center;padding:1rem;
+  background:rgba(8,12,28,.5);backdrop-filter:blur(3px);animation:gcfade .2s ease both; }
+body > .gc-modal.out { animation:gcfadeout .18s ease both; }
+body > .gc-modal .gc-mbox { position:relative;width:min(34rem,100%);max-height:86vh;overflow:auto;border-radius:1.25rem;padding:1.3rem 1.4rem 1.2rem;
+  background:var(--ak-card, #fff);border:1px solid var(--ak-line, #e4e9f2);color:var(--ak-text, #182033);box-shadow:0 30px 80px rgba(0,0,0,.35);
+  animation:gcpop .28s cubic-bezier(.2,.9,.3,1.15) both; }
+body > .gc-modal.out .gc-mbox { animation:gcpopout .18s ease both; }
+@keyframes gcfade { from { opacity:0; } to { opacity:1; } }
+@keyframes gcfadeout { to { opacity:0; } }
+@keyframes gcpop { from { opacity:0;transform:translateY(14px) scale(.96); } to { opacity:1;transform:none; } }
+@keyframes gcpopout { to { opacity:0;transform:translateY(8px) scale(.97); } }
+.gc-mhead { display:flex;align-items:center;gap:.75rem;margin:0 2.4rem .9rem 0; }
+.gc-mhead .gc-ico { width:2.6rem;height:2.6rem;border-radius:.8rem;flex:none; }
+.gc-mhead .gc-detail-title { font-size:1.15rem;font-weight:800;color:var(--ak-text, #182033); }
+body > .gc-modal .gc-close { position:absolute;top:.8rem;right:.8rem;width:2rem;height:2rem;border-radius:50%;border:1px solid var(--ak-line, #e4e9f2);
+  background:var(--ak-soft, #eef2ff);color:var(--ak-text, #182033);cursor:pointer;font-size:.95rem;line-height:1;transition:transform .15s ease; }
+body > .gc-modal .gc-close:hover { transform:rotate(90deg); }
+.gc-mbody ol { margin:0 0 .8rem;padding-left:1.25rem;color:var(--ak-text, #182033);line-height:1.55;font-size:.88rem; }
+.gc-mbody li { margin:.3rem 0;animation:gcpop .35s ease both; }
+.gc-mbody li:nth-child(2) { animation-delay:.06s; } .gc-mbody li:nth-child(3) { animation-delay:.12s; }
+.gc-mbody .gc-tip { margin:.6rem 0 .9rem; } .gc-mbody .ak-go { animation:gcpop .35s ease .18s both; }
+
+/* ===== Progression détaillée (carrousel) : couleurs du thème choisi ===== */
+html:root:root:root:root body > .gp-modal { background:radial-gradient(40rem circle at 30% 20%, rgba(79,109,245,.16), transparent 60%),
+  radial-gradient(36rem circle at 75% 30%, rgba(142,108,244,.13), transparent 60%), color-mix(in srgb, var(--ak-bg) 82%, transparent)!important; }
+html:root:root:root:root body > .gp-modal .gp-card { background:var(--ak-card)!important;border-color:var(--ak-line)!important;color:var(--ak-text)!important;
+  box-shadow:0 30px 70px color-mix(in srgb, var(--ak-text) 18%, transparent)!important; }
+html:root:root:root:root body > .gp-modal .gp-card h3, html:root:root:root:root body > .gp-modal .gp-pct, html:root:root:root:root body > .gp-modal .gp-bar em { color:var(--ak-text)!important; }
+html:root:root:root:root body > .gp-modal .gp-date, html:root:root:root:root body > .gp-modal .gp-sub, html:root:root:root:root body > .gp-modal .gp-bar { color:var(--ak-muted)!important; }
+html:root:root:root:root body > .gp-modal .gp-glow { opacity:.22; }
+html:root:root:root:root body > .gp-modal .gp-track-c { stroke:var(--ak-soft)!important; }
+html:root:root:root:root body > .gp-modal .gp-bar > div, html:root:root:root:root body > .gp-modal .gp-chip { background:var(--ak-soft)!important; }
+html:root:root:root:root body > .gp-modal .gp-chip { color:var(--ak-text)!important; }
+html:root:root:root:root body > .gp-modal .gp-dot { background:var(--ak-soft)!important;border-color:var(--ak-card)!important;color:var(--ak-muted)!important; }
+html:root:root:root:root body > .gp-modal .gp-dot.on { background:var(--c)!important;color:#fff!important; }
+html:root:root:root:root body > .gp-modal .gp-card .gp-foot { border-top-color:var(--ak-line)!important; }
+html:root:root:root:root body > .gp-modal .gp-nav, html:root:root:root:root body > .gp-modal .gp-close { background:var(--ak-card)!important;border-color:var(--ak-line)!important;color:var(--ak-text)!important;
+  box-shadow:0 8px 22px color-mix(in srgb, var(--ak-text) 14%, transparent); }
+html:root:root:root:root body > .gp-modal .gp-nav:hover, html:root:root:root:root body > .gp-modal .gp-close:hover { background:var(--ak-soft)!important; }
+html:root:root:root:root body > .gp-modal .gp-pager i { background:color-mix(in srgb, var(--ak-text) 25%, transparent)!important; }
+html:root:root:root:root body > .gp-modal .gp-pager i.on { background:#4f6df5!important; }
+
+/* ===== Assistant : conversation encadrée, centrée et sans boutons parasites ===== */
+html:root:root:root:root body #assistant-chatbot .top-panel, html:root:root:root:root body #assistant-chatbot .message-buttons,
+html:root:root:root:root body #assistant-chatbot .message-buttons-left, html:root:root:root:root body #assistant-chatbot .message-buttons-right { display:none!important; }
+html:root:root:root:root body.in-app #assistant-chatbot, html:root:root:root:root body.in-app.akori-dark #assistant-chatbot {
+  border:1px solid var(--ak-line)!important;border-radius:1rem!important;background:var(--ak-bg)!important; }
+html:root:root:root:root body.in-app #assistant-chatbot > .wrapper, html:root:root:root:root body.in-app #assistant-chatbot .bubble-wrap { background:transparent!important; }
+html:root:root:root:root body #assistant-chatbot .message-wrap { max-width:58rem;margin:0 auto!important;padding:1.1rem 1.2rem 1.4rem!important; }
+html:root:root:root:root body #scope-row, html:root:root:root:root body #assistant-bar { width:100%!important;max-width:58rem;margin-left:auto!important;margin-right:auto!important; }
+html:root:root:root:root body.m-mode #assistant-chatbot .message-wrap { padding:.7rem .6rem 1rem!important; }
 """
 
 
@@ -7272,22 +7321,37 @@ AKORI_NAV_JS = r"""
   };
   window.addEventListener('resize', fitScreen);
   window.setInterval(fitScreen, 300);
-  // Guide de l'accueil : une seule fiche ouverte, fermeture par la croix ou en touchant à côté
-  document.addEventListener('toggle', (event) => {
-    const d = event.target;
-    if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('guide-card') || !d.open) return;
-    document.querySelectorAll('details.guide-card[open]').forEach((o) => { if (o !== d) o.open = false; });
-    const det = d.querySelector('.gc-detail');
-    if (det && !det.querySelector('.gc-close')) {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'gc-close'; b.textContent = '✕';
-      const t = document.createElement('div'); t.className = 'gc-detail-title'; t.textContent = (d.querySelector('.gc-body b') || {}).textContent || '';
-      det.prepend(t); det.prepend(b);
-    }
-  }, true);
+  // Guide de l'accueil : la fiche s'ouvre dans une fenêtre centrée, posée sur la page (jamais décalée par la carte)
+  const gcClose = (modal) => {
+    if (!modal || modal.classList.contains('out')) return;
+    modal.classList.add('out');
+    window.setTimeout(() => modal.remove(), 180);
+  };
   document.addEventListener('click', (event) => {
-    const open = document.querySelector('details.guide-card[open]');
-    if (!open) return;
-    if (event.target.closest('.gc-close') || event.target.closest('.ak-go') || !event.target.closest('.gc-detail')) { open.open = false; if (!event.target.closest('.ak-go')) event.preventDefault(); }
+    const sum = event.target.closest && event.target.closest('details.guide-card > summary');
+    if (!sum) return;
+    event.preventDefault();
+    const card = sum.parentElement;
+    const det = card.querySelector('.gc-detail');
+    if (!det) return;
+    document.querySelectorAll('body > .gc-modal').forEach((m) => m.remove());
+    const modal = document.createElement('div');
+    modal.className = 'gc-modal'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+    const box = document.createElement('div'); box.className = 'gc-mbox';
+    const head = document.createElement('div'); head.className = 'gc-mhead';
+    const ico = card.querySelector('.gc-ico'); if (ico) head.appendChild(ico.cloneNode(true));
+    const t = document.createElement('div'); t.className = 'gc-detail-title'; t.textContent = (card.querySelector('.gc-body b') || {}).textContent || '';
+    head.appendChild(t);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'gc-close'; x.setAttribute('aria-label', 'Fermer'); x.textContent = '✕';
+    box.appendChild(x); box.appendChild(head);
+    const body = document.createElement('div'); body.className = 'gc-mbody'; body.innerHTML = det.innerHTML;
+    box.appendChild(body); modal.appendChild(box); document.body.appendChild(modal);
+    const onKey = (e) => { if (e.key === 'Escape') { gcClose(modal); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target.closest('.gc-close') || e.target.closest('.ak-go')) { gcClose(modal); document.removeEventListener('keydown', onKey); }
+    });
+    x.focus();
   }, true);
   // Mes dossiers : suppression d'un PDF après confirmation
   document.addEventListener('click', (event) => {
