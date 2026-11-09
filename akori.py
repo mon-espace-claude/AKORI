@@ -1199,8 +1199,8 @@ def _progress_carousel_html():
         plan = _space().get("plan") or {}
     except Exception:
         mods, plan = {}, {}
-    exam = _parse_day(plan.get("exam_date")) if plan else None
-    exam_names = set(_plan_names(plan.get("scope"))) if exam else set()
+    exam = _parse_day(plan.get("exam_date")) if plan and plan.get("context") != "free" else None
+    exam_names = set(_plan_cfg_names(plan)) if exam else set()
     cards = []
     for i, (name, data) in enumerate(documents_db.items()):
         cs = _course_stats(name)
@@ -2438,10 +2438,10 @@ def dashboard_html(active_doc=None):
          ["Choisissez le cours actif puis lancez « Générer la mindmap ».", "Le thème est au centre, les grandes notions autour, leurs détails au bout des branches.",
           "Cliquez sur une branche pour la replier ou la déplier et réviser bloc par bloc."],
          "La carte est conservée avec le cours : vous la retrouvez à chaque visite.", "Ouvrir la mindmap"),
-        ("plan", "📅", "Plan de révision", "Indiquez la date de l'examen : AKORI construit le plan jour par jour.",
-         ["Saisissez la date, la portée (un cours, un module, tout) et le temps disponible par jour.",
-          "Le plan mélange vos points faibles et une répétition espacée (1, 3, 7 puis 14 jours).",
-          "Il se recalcule après chaque séance et vous indique les pages à relire."],
+        ("plan", "📅", "Plan de révision", "Un assistant en 5 étapes construit ton emploi du temps de révision.",
+         ["Contexte et calendrier : examen, contrôle continu ou apprentissage libre, la date et le temps par jour.",
+          "Matières et rythme : choisissez vos PDF, l'intensité, les jours de repos et les fonctions IA.",
+          "L'emploi du temps s'affiche semaine par semaine : touchez une séance pour voir son détail et la lancer."],
          "Un jour de repos est prévu : la mémoire consolide aussi quand vous ne travaillez pas.", "Créer mon plan"),
         ("reviewq", "📌", "À revoir", "Retrouvez les réponses épinglées, cours par cours.",
          ["Épinglez une réponse de l'assistant depuis le chat.", "Retrouvez-la ici, rangée par cours.", "Relisez-la ou écoutez-la avant l'examen."],
@@ -2878,16 +2878,58 @@ def _parse_day(value):
         return None
 
 
-def build_plan(exam_day, names, minutes, today=None):
+PLAN_INTENSITY = {   # rythme choisi à l'étape 4 : durée des séances et écart entre deux répétitions
+    "low": {"mult": 0.8, "intervals": [2, 5, 10, 20], "label": "Faible"},
+    "mid": {"mult": 1.0, "intervals": [1, 3, 7, 14], "label": "Moyenne"},
+    "high": {"mult": 1.2, "intervals": [1, 2, 4, 8], "label": "Élevée"},
+}
+PLAN_CONTEXTS = {"exam": "Examen", "cc": "Contrôle continu", "free": "Apprentissage libre"}
+PLAN_ACTS = ["notes", "flash", "quiz", "oral"]
+PLAN_AI = ["spaced", "prio", "alerts"]
+PLAN_FREE_DAYS = 28            # apprentissage libre sans date : plan sur 4 semaines
+PLAN_PAUSE = 5                 # minutes de pause entre deux séances d'une même journée
+
+
+def build_plan(exam_day, names, minutes, today=None, opts=None):
     """Plan jour par jour : points faibles d'abord, puis activités espacées selon ce que l'étudiant a déjà fait.
 
-    Chaque activité revient à intervalles croissants (1, 3, 7, 14 jours) ; une séance réalisée repousse la suivante,
-    un mauvais résultat la rapproche. Le plan est recalculé à chaque ouverture, donc après chaque séance."""
+    Chaque activité revient à intervalles croissants (selon le rythme choisi) ; une séance réalisée repousse la suivante,
+    un mauvais résultat la rapproche. Les jours de repos ne reçoivent aucune séance. Le plan est recalculé à chaque
+    ouverture, donc après chaque séance. `exam_day=None` : apprentissage libre sur PLAN_FREE_DAYS jours."""
+    opts = opts or {}
     today = today or _date.today()
-    days_left = (exam_day - today).days
-    if days_left < 0 or not names:
+    acts = set(opts.get("acts") or PLAN_ACTS)
+    ai = set(PLAN_AI if opts.get("ai") is None else opts.get("ai"))
+    spaced, prio, final_review = "spaced" in ai, "prio" in ai, opts.get("final", True)
+    rhythm = PLAN_INTENSITY.get(opts.get("intensity") or "mid", PLAN_INTENSITY["mid"])
+    intervals = rhythm["intervals"]
+    rest = {int(x) for x in (opts.get("rest") or []) if str(x).isdigit()}
+    if len(rest) >= 7:
+        rest = set()
+    if exam_day is None:
+        days_left, horizon, final_review = PLAN_FREE_DAYS, PLAN_FREE_DAYS, False
+    else:
+        days_left = (exam_day - today).days
+        if days_left < 0:
+            return None
+        horizon = max(1, min(days_left, 60))                # jours de révision avant l'examen
+    if not names:
         return None
-    horizon = max(1, min(days_left, 60))                    # jours de révision avant l'examen
+
+    def is_rest(o):
+        return (today + _timedelta(days=o)).weekday() in rest
+
+    work_days = [o for o in range(horizon) if not is_rest(o)] or list(range(horizon))
+    last_work = work_days[-1]
+
+    def place(o):
+        """Jour de travail le plus proche à partir de `o` (sinon le dernier jour de travail)."""
+        o = max(0, o)
+        return next((d for d in work_days if d >= o), last_work)
+
+    def scaled(m):
+        return max(5, int(round(m * rhythm["mult"])))
+
     sessions = _read_sessions()
     last_done, recent = {}, {}
     for rec in sessions:
@@ -2899,14 +2941,14 @@ def build_plan(exam_day, names, minutes, today=None):
         if (today - d).days <= 14:
             recent.setdefault(key, set()).add(d)
 
-    def occurrences(first, box, repeat=True):
+    def occurrences(first, box):
         out, day, i = [], first, 0
         while day < horizon:
             out.append(day)
-            if not repeat:
+            if not spaced:
                 break
             i += 1
-            day += SPACED_INTERVALS[min(box + i, len(SPACED_INTERVALS) - 1)] if horizon > 4 else horizon
+            day += intervals[min(box + i, len(intervals) - 1)] if horizon > 4 else horizon
         return out or [min(first, horizon - 1)]
 
     def first_day(key, offset):
@@ -2914,22 +2956,31 @@ def build_plan(exam_day, names, minutes, today=None):
         box = min(len(recent.get(key, ())), 3)
         if not last:
             return min(offset, horizon - 1), 0
-        return max(0, (last - today).days + SPACED_INTERVALS[box]), box
+        return max(0, (last - today).days + (intervals[box] if spaced else 1)), box
 
+    if prio:   # Priorisation IA : les cours les moins prêts passent en premier
+        names = sorted(names, key=lambda n: _course_stats(n)["percent"])
+    final_label = "Révision avant le contrôle" if opts.get("context") == "cc" else "Revue finale"
     tasks = []
     for order, name in enumerate(names):
         cs = _course_stats(name)
-        short = os.path.splitext(name)[0]
-        if not cs["summary"]:
-            tasks.append({"kind": "summary", "doc": name, "label": "Lire le résumé du cours", "pages": [], "minutes": 10, "day": min(order, horizon - 1), "prio": 5})
-        pages = _weak_pages(name)
-        for i in range(0, len(pages), 3):
-            group = pages[i:i + 3]
-            tasks.append({"kind": "reread", "doc": name, "label": "Relire les pages faibles", "pages": group,
-                          "minutes": 6 * len(group), "day": min(order + i // 3, horizon - 1), "prio": 10 - i // 3})
-            if horizon > 6:
-                tasks.append({"kind": "reread", "doc": name, "label": "Relire les pages faibles (rappel)", "pages": group,
-                              "minutes": 4 * len(group), "day": min(order + i // 3 + 3, horizon - 1), "prio": 4})
+        pages = _weak_pages(name) if ("notes" in acts or final_review) else []
+        if "notes" in acts:
+            if not cs["summary"]:
+                tasks.append({"kind": "summary", "doc": name, "label": "Lire le résumé du cours", "pages": [], "minutes": scaled(10),
+                              "day": min(order, horizon - 1), "prio": 5,
+                              "why": "Le résumé n'a pas encore été généré : c'est la base avant de s'entraîner."})
+            for i in range(0, len(pages), 3):
+                group = pages[i:i + 3]
+                reasons = ", ".join(dict.fromkeys(r for pg in group for r in pg["reasons"]))
+                why = f"Pages repérées grâce à vos erreurs ({reasons})." if reasons else "Pages repérées grâce à vos erreurs."
+                tasks.append({"kind": "reread", "doc": name, "label": "Relire les pages faibles", "pages": group,
+                              "minutes": scaled(6 * len(group)), "day": min(order + i // 3, horizon - 1),
+                              "prio": (10 - i // 3) if prio else 5, "why": why})
+                if horizon > 6 and spaced:
+                    tasks.append({"kind": "reread", "doc": name, "label": "Relire les pages faibles (rappel)", "pages": group,
+                                  "minutes": scaled(4 * len(group)), "day": min(order + i // 3 + intervals[1], horizon - 1), "prio": 4,
+                                  "why": f"Répétition espacée : rappel {intervals[1]} jour(s) après la première relecture."})
         specs = [
             ("flash", cs["flash_answered"] == 0, "Générer puis faire une série de flashcards", cs["flash_review"] > 0,
              f"Refaire les {cs['flash_review']} flashcard(s) « à revoir »", "Entretenir tes flashcards", 12, 1),
@@ -2939,32 +2990,59 @@ def build_plan(exam_day, names, minutes, today=None):
              f"Repasser une colle orale (moyenne {cs['oral_avg']:.1f}/10)", "Passer une colle orale d'entretien", 10, 3),
         ]
         for kind, never, never_label, weak, weak_label, keep_label, mins, offset in specs:
+            if kind not in acts:
+                continue
             start, box = first_day((name, kind), offset + order)
             label = never_label if never else (weak_label if weak else keep_label)
             if not never and not weak and last_done.get((name, kind)) is None:
                 continue
-            for k, day in enumerate(occurrences(start, box, repeat=True)):
+            for k, day in enumerate(occurrences(start, box)):
+                if k == 0:
+                    why = ("Première séance : elle mesure votre niveau de départ." if never else
+                           "Résultats encore fragiles : la séance revient plus tôt." if weak else
+                           "Répétition espacée : on revient sur ce cours avant de l'oublier.")
+                else:
+                    why = f"Répétition espacée : rappel n° {k} pour ancrer la mémoire à long terme."
                 tasks.append({"kind": kind, "doc": name, "label": label if k == 0 else (weak_label if weak else keep_label),
-                              "pages": [], "minutes": mins if k == 0 else max(6, mins - 4), "day": day, "prio": 8 - offset - (0 if weak or never else 3)})
-        if horizon >= 2:
-            tasks.append({"kind": "final", "doc": name, "label": "Revue finale : résumé, flashcards à revoir et une colle rapide", "pages": pages[:3],
-                          "minutes": 15, "day": horizon - 1, "prio": 9})
+                              "pages": [], "minutes": scaled(mins if k == 0 else max(6, mins - 4)), "day": day,
+                              "prio": (8 - offset - (0 if weak or never else 3)) if prio else 4, "why": why})
+        if final_review and horizon >= 2:
+            tasks.append({"kind": "final", "doc": name, "label": f"{final_label} : résumé, flashcards à revoir et une colle rapide",
+                          "pages": pages[:3], "minutes": scaled(15), "day": last_work, "prio": 9,
+                          "why": "Dernière séance avant le jour J : on repasse uniquement sur l'essentiel."})
 
     days = [[] for _ in range(horizon)]
     load = [0] * horizon
     for task in sorted(tasks, key=lambda t: (t["day"], -t["prio"])):
-        d = max(0, min(task["day"], horizon - 1))
-        while d < horizon - 1 and load[d] > 0 and load[d] + task["minutes"] > minutes and task["kind"] != "final":
-            d += 1
+        d = place(task["day"]) if task["kind"] != "final" else last_work
+        while task["kind"] != "final" and load[d] > 0 and load[d] + task["minutes"] > minutes:
+            nxt = next((x for x in work_days if x > d), None)
+            if nxt is None:
+                break
+            d = nxt
         days[d].append(task)
         load[d] += task["minutes"]
     done_today = {(r.get("doc", ""), r["k"]) for r in sessions if r.get("k") in ("flash", "quiz", "oral", "summary") and _parse_day(r.get("t")) == today}
     for task in days[0]:
         task["done"] = (task["doc"], task["kind"]) in done_today
-    return {"days": days, "load": load, "days_left": days_left, "horizon": horizon, "today": today}
+    alerts = []
+    if "alerts" in ai:
+        over = [o for o in range(horizon) if load[o] > minutes and len(days[o]) > 1]
+        if over:
+            first = today + _timedelta(days=over[0])
+            alerts.append(f"Surcharge : {len(over)} jour(s) dépassent vos {minutes} min, dès le "
+                          f"{PLAN_DAYS[first.weekday()]} {first.strftime('%d/%m')}. Augmentez le temps par jour ou retirez un jour de repos.")
+        total, capacity = sum(load), minutes * len(work_days)
+        if capacity and total > capacity:
+            alerts.append(f"Le plan demande {total} min pour {capacity} min disponibles : choisissez un rythme plus faible ou moins de matières.")
+        if exam_day is not None and 0 < days_left <= 3 and len(names) > 2:
+            alerts.append(f"Examen dans {days_left} jour(s) pour {len(names)} matières : concentrez-vous sur les pages faibles.")
+    return {"days": days, "load": load, "days_left": days_left, "horizon": horizon, "today": today, "rest": rest,
+            "alerts": alerts, "exam": exam_day, "cap": minutes, "names": names}
 
 
 PLAN_KIND_ICON = {"summary": "📚", "reread": "📖", "flash": "🎰", "quiz": "🎯", "oral": "🎤", "final": "🏆"}
+PLAN_KIND_NAME = {"summary": "Résumé", "reread": "Relecture", "flash": "Flashcards", "quiz": "Quiz", "oral": "Colle orale", "final": "Revue finale"}
 PLAN_DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
 
@@ -2977,15 +3055,14 @@ def _plan_names(scope):
     return list(documents_db.keys())
 
 
-def _plan_scope_choices():
-    mods = _space()["modules"]
-    choices = [("Tous mes cours", "all")]
-    choices += [(f"Module · {m.get('name', '')}", f"mod:{mid}") for mid, m in sorted(mods.items(), key=lambda kv: kv[1].get("name", "").lower())]
-    choices += [(f"Cours · {os.path.splitext(n)[0]}", f"doc:{n}") for n in documents_db]
-    return choices
+def _plan_cfg_names(cfg):
+    """Cours du plan : les PDF choisis à l'étape « Matières » (anciens plans : portée enregistrée)."""
+    if isinstance(cfg.get("docs"), list):
+        return [n for n in cfg["docs"] if n in documents_db]
+    return _plan_names(cfg.get("scope"))
 
 
-PLAN_KIND_COLOR = {"summary": "#4f6df5", "reread": "#8e6cf4", "flash": "#e0a43a", "quiz": "#2ea383", "oral": "#e86fb0", "final": "#4f6df5"}
+PLAN_KIND_COLOR = {"summary": "#4f6df5", "reread": "#8e6cf4", "flash": "#e0a43a", "quiz": "#2ea383", "oral": "#e86fb0", "final": "#f0715a"}
 PLAN_KIND_GO = {"summary": "summary", "reread": "summary", "flash": "flash", "quiz": "quiz", "oral": "oral", "final": "oral"}
 FR_MONTHS_LONG = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 
@@ -3005,206 +3082,341 @@ def _plan_done_pct(cfg, names, plan):
     return round(done / (done + remaining) * 100) if (done + remaining) else 0
 
 
-def _plan_week_cards(week_days, plan, multi):
-    """Regroupe les séances d'une semaine par (cours, activité) : une carte par groupe, pas une liste par jour."""
-    groups = {}
-    for offset, tasks in week_days:
-        for t in tasks:
-            g = groups.setdefault((t["doc"], t["kind"]), {"t": t, "minutes": 0, "days": [], "pages": {}, "today": False,
-                                                           "done": False, "prio": 0})
-            g["minutes"] += t["minutes"]
-            g["days"].append(offset)
-            g["prio"] = max(g["prio"], t.get("prio", 0))
-            for pg in t.get("pages") or []:
-                g["pages"][pg["page"]] = pg
-            if offset == 0:
-                g["today"] = True
-                g["done"] = g["done"] or bool(t.get("done"))
-    cards = []
-    order = sorted(groups.values(), key=lambda g: (min(g["days"]), -g["prio"]))
-    for g in order:
-        t = g["t"]
-        later = [d for d in g["days"] if d > 0]
-        if g["today"] and g["done"]:
-            status, cls = ("En cours", "st-run") if later else ("Fait", "st-ok")
-        elif g["today"]:
-            status, cls = "À faire", "st-todo"
-        elif g["prio"] <= 4:
-            status, cls = "Facultative", "st-opt"
-        else:
-            status, cls = "Planifiée", "st-plan"
-        when = []
-        for d in g["days"][:6]:
-            day = plan["today"] + _timedelta(days=d)
-            when.append("Aujourd'hui" if d == 0 else ("Demain" if d == 1 else f"{PLAN_DAYS[day.weekday()][:3]}. {day.strftime('%d/%m')}"))
-        pages = "".join(f"<span class='plan-page' title='{_escape_html(', '.join(pg.get('reasons', [])))}'>p. {int(pg['page'])}"
-                        f"{(' · ' + _escape_html(pg['section'][:26])) if pg.get('section') else ''}</span>" for pg in list(g["pages"].values())[:6])
-        n = len(g["days"])
-        doc = _escape_html(t["doc"])
-        color = PLAN_KIND_COLOR.get(t["kind"], "#4f6df5")
-        go_tab = PLAN_KIND_GO.get(t["kind"], "summary")
-        launch = ("<span class='pl-launched'>✅ Séance faite</span>" if g["done"] and not later else
-                  f"<button type='button' class='pl-go ak-t-{go_tab}' data-doc='{doc}'>Lancer la séance</button>")
-        more = (f"<div class='pl-more'><div><b>Cours</b><span>{_escape_html(_plan_short(t['doc'], 60))}</span></div>"
-                f"<div><b>Séances</b><span>{n} · {' · '.join(when)}{' …' if n > 6 else ''}</span></div>"
-                + (f"<div><b>Pages</b><span class='plan-pages'>{pages}</span></div>" if pages else "") + "</div>")
-        cards.append(
-            f"<div class='pl-task' style='--k:{color}'><div class='pl-top'><span class='pl-ico'>{PLAN_KIND_ICON.get(t['kind'], '📌')}</span>"
-            f"<div class='pl-tt'><b>{_escape_html(t['label'])}</b>"
-            f"{('<em>' + _escape_html(_plan_short(t['doc'], 28)) + '</em>') if multi else ''}</div></div>"
-            f"<div class='pl-meta'><span class='pl-min'>🕑 {g['minutes']} min{(' · ' + str(n) + ' séances') if n > 1 else ''}</span>"
-            f"<span class='pl-st {cls}'>{status}</span></div>{more}"
-            f"<div class='pl-btns'><button type='button' class='pl-det'>Détails</button>{launch}</div></div>")
-    if len(cards) > 4:
-        rest = len(cards) - 4
-        cards = cards[:4] + [f"<button type='button' class='pl-showall'>+ {rest} autre(s) séance(s) cette semaine</button>"] + \
-                [c.replace("<div class='pl-task'", "<div class='pl-task pl-extra'", 1) for c in cards[4:]]
-    return "".join(cards)
+# ---------------- assistant de création du plan (5 étapes) puis emploi du temps intelligent
+PW_STEPS = [
+    ("ÉTAPE 1 : CONTEXTE", "Bienvenue ! Dis-moi, c'est pour quoi ?"),
+    ("ÉTAPE 2 : CALENDRIER", "Quel est le grand jour, et combien de temps par jour ?"),
+    ("ÉTAPE 3 : MATIÈRES", "Qu'est-ce que tu révises ?"),
+    ("ÉTAPE 4 : RYTHME", "Quelle intensité veux-tu ?"),
+    ("ÉTAPE 5 : INTELLIGENCE", "Presque fini ! Choisis les fonctions IA."),
+]
+PW_CONTEXT_CHOICES = [("Examen", "exam"), ("Contrôle continu", "cc"), ("Apprentissage libre", "free")]
+PW_ACT_CHOICES = [("Notes (résumé et pages à relire)", "notes"), ("Flashcards", "flash"), ("Quiz", "quiz"), ("Colle orale", "oral")]
+PW_INTENSITY_CHOICES = [("Faible", "low"), ("Moyenne", "mid"), ("Élevée", "high")]
+PW_REST_CHOICES = [("Lun", "0"), ("Mar", "1"), ("Mer", "2"), ("Jeu", "3"), ("Ven", "4"), ("Sam", "5"), ("Dim", "6")]
+PW_AI_CHOICES = [("Répétition espacée", "spaced"), ("Priorisation IA", "prio"), ("Alertes de surcharge", "alerts")]
+PW_START_CHOICES = [f"{h:02d}:{m:02d}" for h in range(6, 23) for m in (0, 30)]
+PW_DEFAULTS = {"context": "exam", "exam_name": "", "exam_date": "", "minutes": 40, "start": "18:00", "acts": list(PLAN_ACTS),
+               "intensity": "mid", "rest": ["6"], "ai": ["spaced", "prio"]}
+
+
+def _pw_mascot(pose):
+    """Mascotte d'AKORI (goutte bleue) dans la pose de l'étape : salut, montre, réfléchit, muscles, plan prêt."""
+    arms = {
+        "wave": "<path d='M34 96 Q16 112 24 128'/><path d='M126 82 Q148 62 140 36'/><circle cx='140' cy='32' r='7' class='mc-hand'/>",
+        "point": "<path d='M34 96 Q18 112 26 128'/><path d='M126 88 Q146 84 158 74'/><circle cx='160' cy='72' r='7' class='mc-hand'/>",
+        "think": "<path d='M34 96 Q18 112 26 128'/><path d='M126 96 Q124 120 100 112'/><circle cx='98' cy='110' r='7' class='mc-hand'/>",
+        "flex": "<path d='M34 88 Q8 84 14 56'/><circle cx='14' cy='52' r='8' class='mc-hand'/><path d='M126 88 Q152 84 146 56'/><circle cx='146' cy='52' r='8' class='mc-hand'/>",
+        "scroll": "<path d='M34 96 Q40 120 58 118'/><path d='M126 96 Q120 120 102 118'/>",
+    }[pose]
+    if pose == "flex":
+        face = ("<path d='M56 62 L74 70 M104 62 L86 70' class='mc-brow'/><ellipse cx='66' cy='78' rx='6' ry='7' class='mc-eye'/>"
+                "<ellipse cx='94' cy='78' rx='6' ry='7' class='mc-eye'/><path d='M68 100 Q80 94 92 100' class='mc-mouth'/>")
+    elif pose == "scroll":
+        face = "<path d='M58 76 Q66 68 74 76 M86 76 Q94 68 102 76' class='mc-mouth'/><path d='M66 92 Q80 106 94 92' class='mc-mouth'/>"
+    else:
+        face = ("<ellipse cx='66' cy='76' rx='7' ry='9' class='mc-eye'/><ellipse cx='94' cy='76' rx='7' ry='9' class='mc-eye'/>"
+                "<circle cx='68' cy='72' r='2.6' fill='#fff'/><circle cx='96' cy='72' r='2.6' fill='#fff'/>"
+                "<path d='M66 94 Q80 108 94 94' class='mc-mouth'/>")
+    extra = ""
+    if pose == "scroll":
+        extra = ("<g class='mc-scroll'><rect x='42' y='104' width='76' height='70' rx='6' fill='#fbfaf4' stroke='#c9c3ad' stroke-width='2'/>"
+                 "<text x='80' y='122' text-anchor='middle'>PLAN PRÊT !</text><path d='M54 132 H106 M54 142 H100 M54 152 H94' stroke='#9fb2d8' stroke-width='3' stroke-linecap='round'/>"
+                 "<path d='M92 154 l8 8 14 -18' stroke='#1fa463' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></g>")
+    if pose == "think":
+        extra = "<g class='mc-dots'><circle cx='138' cy='30' r='4'/><circle cx='150' cy='18' r='6'/></g>"
+    return (f"<svg class='pw-mascot{' pw-right' if pose == 'scroll' else ''}' viewBox='0 0 170 190' aria-hidden='true'><defs>"
+            "<radialGradient id='mcb' cx='38%' cy='30%' r='75%'><stop offset='0' stop-color='#b7e3ff'/><stop offset='.45' stop-color='#4ea4ff'/>"
+            "<stop offset='1' stop-color='#1f56d0'/></radialGradient></defs>"
+            "<ellipse cx='80' cy='182' rx='44' ry='6' fill='rgba(0,0,0,.25)'/>"
+            "<path d='M66 136 V170 M94 136 V170' class='mc-leg'/><path d='M58 172 H70 M90 172 H102' class='mc-leg'/>"
+            f"<g class='mc-arms'>{arms}</g>"
+            "<ellipse cx='80' cy='82' rx='54' ry='58' fill='url(#mcb)'/>"
+            "<ellipse cx='62' cy='50' rx='18' ry='10' fill='#fff' opacity='.35' transform='rotate(-25 62 50)'/>"
+            f"{face}{extra}</svg>")
+
+
+PW_POSES = ["wave", "point", "think", "flex", "scroll"]
+
+
+def _pw_head(step):
+    step = max(1, min(5, int(step or 1)))
+    title, sub = PW_STEPS[step - 1]
+    return (f"<div class='pw-head'><div class='pw-bar'><i style='width:{step * 20}%'></i></div>"
+            f"<span class='pw-brand'>AKORI Study</span><h2>{title}</h2><p>{sub}</p></div>")
+
+
+def _pw_doc_choices():
+    mods = _space()["modules"]
+    out = []
+    for name, data in documents_db.items():
+        mod = mods.get(data.get("module") or "")
+        prefix = f"{mod.get('semester') or ''} · {mod.get('name', '')} — " if mod else ""
+        out.append((prefix.lstrip(" ·") + (data.get("title") or os.path.splitext(name)[0])[:70], name))
+    return out
+
+
+def _plan_cfg():
+    cfg = dict(PW_DEFAULTS)
+    cfg.update(_space().get("plan") or {})
+    return cfg
+
+
+def _plan_ready(cfg=None):
+    cfg = cfg if cfg is not None else (_space().get("plan") or {})
+    return bool(cfg.get("exam_date") or cfg.get("context") == "free")
+
+
+def _hm(minutes):
+    minutes = int(minutes) % (24 * 60)
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def _edt_status(task, offset):
+    if offset == 0:
+        return ("Fait", "st-ok") if task.get("done") else ("À faire", "st-todo")
+    return ("Facultative", "st-opt") if task.get("prio", 5) <= 3 else ("Planifiée", "st-plan")
+
+
+def _edt_detail(task, when, start, end, offset, multi_ai):
+    color = PLAN_KIND_COLOR.get(task["kind"], "#4f6df5")
+    status, cls = _edt_status(task, offset)
+    pages = "".join(f"<span class='plan-page' title='{_escape_html(', '.join(pg.get('reasons', [])))}'>p. {int(pg['page'])}"
+                    f"{(' · ' + _escape_html(pg['section'][:28])) if pg.get('section') else ''}</span>" for pg in task.get("pages") or [])
+    launch = ("" if offset < 0 or task.get("done") else
+              f"<button type='button' class='pl-go ak-t-{PLAN_KIND_GO.get(task['kind'], 'summary')}' data-doc='{_escape_html(task['doc'])}'>Lancer la séance</button>")
+    return (f"<div class='ed-card' style='--k:{color}'><div class='ed-top'><span class='ed-ico'>{PLAN_KIND_ICON.get(task['kind'], '📌')}</span>"
+            f"<div><small>{PLAN_KIND_NAME.get(task['kind'], '')}</small><h3>{_escape_html(task['label'])}</h3></div></div>"
+            f"<div class='ed-grid'><div><span>Cours</span><b>{_escape_html(_plan_short(task['doc'], 60))}</b></div>"
+            f"<div><span>Quand</span><b>{when} · {start} – {end}</b></div><div><span>Durée</span><b>{task['minutes']} min</b></div>"
+            f"<div><span>Statut</span><b><i class='pl-st {cls}'>{status}</i></b></div></div>"
+            + (f"<div class='ed-why'><b>Pourquoi cette séance ?</b><p>{_escape_html(task.get('why', ''))}</p></div>" if multi_ai and task.get("why") else "")
+            + (f"<div class='ed-pages'><b>Pages à relire</b><div class='plan-pages'>{pages}</div></div>" if pages else "")
+            + f"<div class='ed-acts'>{launch}</div></div>")
 
 
 def plan_html():
-    cfg = _space().get("plan") or {}
-    exam = _parse_day(cfg.get("exam_date"))
-    if not exam:
-        return ("<div class='empty-study'>📅<br><b>Indiquez la date de votre examen.</b><br>AKORI construit alors un plan semaine par semaine, "
-                "avec les pages à relire et une répétition espacée, et le met à jour après chaque séance.</div>")
-    names = _plan_names(cfg.get("scope"))
-    minutes = int(cfg.get("minutes", 40) or 40)
-    title = _escape_html(cfg.get("exam_name") or "Votre examen")
+    """Emploi du temps intelligent : une semaine à l'écran, séances placées à l'heure, détail au toucher."""
+    cfg = _plan_cfg()
+    if not _plan_ready(cfg):
+        return ""
+    names = _plan_cfg_names(cfg)
     if not names:
-        return "<div class='empty-study'>Aucun cours dans la portée choisie. Importez un PDF ou changez la portée du plan.</div>"
-    plan = build_plan(exam, names, minutes)
+        return ("<div class='empty-study'>📅<br><b>Aucune matière dans ce plan.</b><br>Importez un PDF ou cliquez sur « Modifier le plan » pour choisir vos matières."
+                "<br><button type='button' class='pl-btn pl-primary edt-edit'>Modifier le plan</button></div>")
+    context = cfg.get("context") or "exam"
+    exam = _parse_day(cfg.get("exam_date"))
+    if context == "free" and not exam:
+        exam = None
+    minutes = int(cfg.get("minutes", 40) or 40)
+    ai = list(cfg.get("ai") or [])
+    plan = build_plan(exam, names, minutes, opts={"acts": cfg.get("acts"), "rest": cfg.get("rest"), "intensity": cfg.get("intensity"),
+                                                  "ai": ai, "context": context, "final": context != "free"})
     if plan is None:
-        return ("<div class='empty-study'>La date de l'examen est dépassée : cliquez sur « Modifier » pour choisir une nouvelle date.</div>")
-    multi = len(names) > 1
+        return ("<div class='empty-study'>📅<br><b>La date du plan est dépassée.</b><br>Cliquez sur « Modifier le plan » pour choisir une nouvelle date."
+                "<br><button type='button' class='pl-btn pl-primary edt-edit'>Modifier le plan</button></div>")
+    try:
+        sh, sm = (int(x) for x in str(cfg.get("start") or "18:00").split(":")[:2])
+    except ValueError:
+        sh, sm = 18, 0
+    day_start = sh * 60 + sm
+    today = plan["today"]
+    explain = "spaced" in ai or "prio" in ai
+    # durée affichée par journée : la plus longue du plan (pauses comprises), arrondie à la demi-heure
+    longest = max([sum(t["minutes"] for t in d) + PLAN_PAUSE * max(0, len(d) - 1) for d in plan["days"]] + [45])
+    span = ((longest + 29) // 30) * 30
+    step = 30 if span <= 180 else 60
+    ticks = "".join(f"<span style='top:{(m / span) * 100:.2f}%'>{_hm(day_start + m)}</span>" for m in range(0, span, step))
+    last_day = today + _timedelta(days=plan["horizon"] - 1)
+    end_day = exam if exam and exam > last_day else last_day
+    monday = today - _timedelta(days=today.weekday())
+    n_weeks = (end_day - monday).days // 7 + 1
+    weeks, labels = [], []
+    for w in range(n_weeks):
+        cols = []
+        week_min = 0
+        for i in range(7):
+            day = monday + _timedelta(days=w * 7 + i)
+            o = (day - today).days
+            head_lbl = f"{PLAN_DAYS[day.weekday()][:3].capitalize()} <b>{day.day:02d}</b>"
+            full = "Aujourd'hui" if o == 0 else f"{PLAN_DAYS[day.weekday()].capitalize()} {day.strftime('%d/%m')}"
+            if exam and day == exam:
+                exam_lbl = "Contrôle" if context == "cc" else ("Examen" if context == "exam" else "Fin du plan")
+                det = (f"<div class='ed-card' style='--k:#e0a43a'><div class='ed-top'><span class='ed-ico'>🏆</span><div><small>{full}</small>"
+                       f"<h3>{_escape_html(cfg.get('exam_name') or exam_lbl)}</h3></div></div>"
+                       "<div class='ed-why'><b>Le jour J</b><p>Pas de nouvelle notion : relisez seulement votre résumé et vos flashcards « à revoir ».</p></div></div>")
+                cols.append(f"<div class='edt-col exam'><button type='button' class='edt-dh'>{head_lbl}<template>{det}</template></button>"
+                            f"<div class='edt-body'><button type='button' class='edt-exam'>🏆<span>{exam_lbl}</span><template>{det}</template></button></div></div>")
+                continue
+            if o < 0 or o >= plan["horizon"]:
+                cols.append(f"<div class='edt-col off'><div class='edt-dh'>{head_lbl}</div><div class='edt-body'></div></div>")
+                continue
+            tasks = plan["days"][o]
+            if not tasks:
+                rest = day.weekday() in plan["rest"]
+                det = (f"<div class='ed-card' style='--k:#8e6cf4'><div class='ed-top'><span class='ed-ico'>☕</span><div><small>{full}</small>"
+                       f"<h3>{'Jour de repos' if rest else 'Journée libre'}</h3></div></div>"
+                       "<div class='ed-why'><p>Laissez la mémoire consolider : aucune séance n'est prévue.</p></div></div>")
+                cols.append(f"<div class='edt-col {'rest' if rest else 'free'}{' today' if o == 0 else ''}'><button type='button' class='edt-dh'>{head_lbl}<template>{det}</template></button>"
+                            f"<div class='edt-body'><span class='edt-rest'>{'Repos' if rest else ''}</span></div></div>")
+                continue
+            blocks, items, cur = [], [], 0
+            for t in tasks:
+                a, b = day_start + cur, day_start + cur + t["minutes"]
+                color = PLAN_KIND_COLOR.get(t["kind"], "#4f6df5")
+                small = " sm" if t["minutes"] / span < .12 else ""
+                det = _edt_detail(t, full, _hm(a), _hm(b), o, explain)
+                course = _escape_html(_plan_short(t["doc"], 26))
+                blocks.append(f"<button type='button' class='edt-blk k-{t['kind']}{small}{' done' if t.get('done') else ''}' "
+                              f"style='top:{cur / span * 100:.2f}%;height:{t['minutes'] / span * 100:.2f}%;--k:{color}'>"
+                              f"<span class='eb-t'>{PLAN_KIND_ICON.get(t['kind'], '📌')} {_escape_html(PLAN_KIND_NAME.get(t['kind'], ''))}</span>"
+                              f"<span class='eb-s'>{course}</span><span class='eb-h'>{_hm(a)} · {t['minutes']} min</span><template>{det}</template></button>")
+                items.append(f"<li style='--k:{color}'><em>{_hm(a)} – {_hm(b)}</em><span>{PLAN_KIND_ICON.get(t['kind'], '📌')} {_escape_html(t['label'])}</span>"
+                             f"<small>{course}</small></li>")
+                cur += t["minutes"] + PLAN_PAUSE
+            week_min += plan["load"][o]
+            over = plan["load"][o] > plan["cap"] and len(tasks) > 1
+            day_det = (f"<div class='ed-card' style='--k:#4f6df5'><div class='ed-top'><span class='ed-ico'>📅</span><div><small>{len(tasks)} séance(s)</small>"
+                       f"<h3>{full} · {plan['load'][o]} min</h3></div></div><ul class='ed-day'>{''.join(items)}</ul>"
+                       + ("<div class='ed-why warn'><p>⚠️ Journée chargée : elle dépasse votre temps par jour.</p></div>" if over and "alerts" in ai else "")
+                       + "</div>")
+            cols.append(f"<div class='edt-col{' today' if o == 0 else ''}{' over' if over and 'alerts' in ai else ''}'>"
+                        f"<button type='button' class='edt-dh'>{head_lbl}<small>{plan['load'][o]} min</small><template>{day_det}</template></button>"
+                        f"<div class='edt-body'>{''.join(blocks)}</div></div>")
+        a, b = monday + _timedelta(days=w * 7), monday + _timedelta(days=w * 7 + 6)
+        label = f"Semaine {w + 1} · {a.strftime('%d/%m')} – {b.strftime('%d/%m')} · {week_min} min"
+        labels.append(label)
+        weeks.append(f"<div class='edt-week{' on' if w == 0 else ''}' data-label='{label}' style='--tick:{step / span * 100:.3f}%'><div class='edt-hours'>{ticks}</div>{''.join(cols)}</div>")
     pct = _plan_done_pct(cfg, names, plan)
     circ = 2 * 3.14159 * 20
     ring = (f"<svg viewBox='0 0 48 48' class='pl-ring' aria-hidden='true'><circle cx='24' cy='24' r='20' class='pl-ring-t'/>"
             + (f"<circle cx='24' cy='24' r='20' class='pl-ring-v' stroke-dasharray='{circ * pct / 100:.1f} {circ:.1f}' transform='rotate(-90 24 24)'/>" if pct else "")
             + f"</svg><b>{pct}%</b>")
-    d_label = "Jour J" if plan["days_left"] == 0 else f"J-{plan['days_left']}"
-    head = (f"<div class='pl-head'>"
-            f"<div class='pl-hc'><b>{title}</b><span>{len(names)} cours</span></div>"
-            f"<div class='pl-hc'><b>{exam.day} {FR_MONTHS_LONG[exam.month - 1]} {exam.year}</b><span>{d_label}</span></div>"
-            f"<div class='pl-hc'><b>{minutes} min/jour</b><span>{sum(plan['load'][:7])} min cette semaine</span></div>"
-            f"<div class='pl-hc pl-prog'><span class='pl-ringw'>{ring}</span><span>Plan de révision<br><b>{pct} % terminé</b></span></div></div>")
-    # Semaines repliables
-    n_weeks = (plan["horizon"] + 6) // 7
-    weeks = []
-    for w in range(n_weeks):
-        span = [(o, plan["days"][o]) for o in range(w * 7, min(plan["horizon"], w * 7 + 7))]
-        if not any(t for _, t in span):
-            continue
-        a, b = plan["today"] + _timedelta(days=span[0][0]), plan["today"] + _timedelta(days=span[-1][0])
-        if n_weeks == 1:
-            name = "Priorités et revue finale"
-        elif w == 0:
-            name = "Vue d'ensemble et priorités"
-        elif w == n_weeks - 1:
-            name = "Revue finale"
-        else:
-            name = "Consolidation"
-        mins = sum(plan["load"][o] for o, _ in span)
-        weeks.append(f"<details class='pl-week'{' open' if not weeks else ''}><summary><b>Semaine {w + 1} : {name}</b>"
-                     f"<span>{a.strftime('%d/%m')} – {b.strftime('%d/%m')} · {mins} min</span><i class='pl-chev'></i></summary>"
-                     f"<div class='pl-grid'>{_plan_week_cards(span, plan, multi)}</div></details>")
-    # Priorités et thèmes (un thème par cours)
-    prios, themes = [], []
-    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    for i, name in enumerate(names):
-        cs = _course_stats(name)
-        weak = _weak_pages(name)
-        level = 0 if (cs["percent"] < 40 or len(weak) >= 3) else (1 if cs["percent"] < 70 else 2)
-        prios.append((level, cs["percent"], name, len(weak)))
-        if i < 8:
-            chips = "".join(f"<span class='plan-page' title='{_escape_html(', '.join(pg['reasons']))}'>p. {int(pg['page'])}"
-                            f"{(' · ' + _escape_html(pg['section'][:26])) if pg.get('section') else ''}</span>" for pg in weak[:8])
-            stats = (f"Flashcards {_pct_or_dash(cs['flash_pct'], cs['flash_total'])} · Quiz {_pct_or_dash(cs['quiz_pct'], cs['quizzes'])}"
-                     f" · Colle {_pct_or_dash(cs['oral_pct'], cs['orals'])}")
-            themes.append(f"<details class='pl-theme'><summary><b>Thème {letters[i]} : {_escape_html(_plan_short(name, 48))}</b>"
-                          f"<span>{cs['percent']} % prêt</span><i class='pl-chev'></i></summary><div class='pl-theme-b'>"
-                          f"<p>{stats}</p>"
-                          + (f"<div class='plan-pages'>{chips}</div>" if chips else "<p class='pl-ok'>Aucune page faible détectée pour l'instant.</p>")
-                          + "</div></details>")
-    lv_name = ["Haute priorité", "Moyenne priorité", "Basse priorité"]
-    prio_html = "".join(
-        f"<div class='pl-prio pr-{lv}'><i></i><div><b>{_escape_html(_plan_short(n, 40))} <span>({lv_name[lv]})</span></b>"
-        f"<small>{pc} % prêt{(' · ' + str(nw) + ' page(s) faible(s)') if nw else ''}</small></div></div>"
-        for lv, pc, n, nw in sorted(prios)[:4])
-    # Calendrier complet (grille, sans défilement)
-    cells = []
-    first = plan["today"]
-    for _ in range(first.weekday()):
-        cells.append("<div class='pl-cd pl-cd-x'></div>")
-    for o in range(plan["horizon"]):
-        day = first + _timedelta(days=o)
-        tasks = plan["days"][o]
-        dots = "".join(f"<i style='background:{PLAN_KIND_COLOR.get(t['kind'], '#4f6df5')}'></i>" for t in tasks[:4])
-        lst = "".join(f"<li>{PLAN_KIND_ICON.get(t['kind'], '📌')} {_escape_html(t['label'])}"
-                      f"{(' · ' + _escape_html(_plan_short(t['doc'], 22))) if multi else ''} <em>{t['minutes']} min</em></li>" for t in tasks)
-        label = "Aujourd'hui" if o == 0 else f"{PLAN_DAYS[day.weekday()].capitalize()} {day.strftime('%d/%m')}"
-        cells.append(f"<button type='button' class='pl-cd{' on' if o == 0 else ''}{' rest' if not tasks else ''}'><b>{day.day}</b>"
-                     f"<span class='pl-dots'>{dots}</span><small>{plan['load'][o] or ''}{' min' if plan['load'][o] else ''}</small>"
-                     f"<template><h4>{label} · {plan['load'][o]} min</h4>"
-                     f"{('<ul>' + lst + '</ul>') if lst else '<p>Jour de repos : laissez la mémoire consolider.</p>'}</template></button>")
-    if plan["days_left"] > 0:
-        cells.append(f"<button type='button' class='pl-cd exam'><b>{exam.day}</b><span class='pl-dots'>🏆</span><small>Examen</small>"
-                     "<template><h4>Jour de l'examen</h4><p>Relisez seulement votre résumé et vos flashcards à revoir.</p></template></button>")
-    heads = "".join(f"<span>{d[:3]}.</span>" for d in PLAN_DAYS)
-    cal = (f"<div class='pl-cal'><div class='pl-cal-h'>{heads}</div><div class='pl-cal-g'>{''.join(cells)}</div>"
-           "<div class='pl-cal-detail'>Touchez un jour pour voir ses séances.</div></div>")
-    adjust = ("<div class='pl-adjust'><span>Temps par jour :</span>" + "".join(
-        f"<button type='button' class='pl-mins{' on' if m == minutes else ''}' data-m='{m}'>{m} min</button>" for m in (20, 30, 40, 60, 90, 120)) + "</div>")
-    actions = ("<div class='pl-actions'><button type='button' class='pl-btn pl-primary pl-edit'>Modifier le plan</button>"
-               "<button type='button' class='pl-btn pl-cal-t'>Voir calendrier complet</button>"
-               "<button type='button' class='pl-btn pl-adj-t'>Ajuster le temps 🕑</button></div>")
-    return (f"<div class='pl-card'><div class='pl-eyebrow'>MON EXAMEN</div>{head}{''.join(weeks)}"
-            f"<div class='pl-sec'>Priorités du plan</div><div class='pl-prios'>{prio_html}</div>"
-            f"{''.join(themes)}{cal}{adjust}{actions}"
-            "<p class='plan-note'>Le plan se recalcule après chaque séance : une activité réussie revient plus tard (1, 3, 7 puis 14 jours), "
-            "un mauvais résultat la rapproche et ajoute les pages à relire.</p></div>")
+    ctx = PLAN_CONTEXTS.get(context, "Examen")
+    if exam:
+        d_label = "Jour J" if plan["days_left"] == 0 else f"J-{plan['days_left']}"
+        when = f"{exam.day} {FR_MONTHS_LONG[exam.month - 1]} {exam.year} · {d_label}"
+    else:
+        when = f"Plan sur {PLAN_FREE_DAYS // 7} semaines"
+    title = _escape_html(cfg.get("exam_name") or ("Votre examen" if context == "exam" else ("Votre contrôle" if context == "cc" else "Mes révisions")))
+    rest_lbl = ", ".join(PLAN_DAYS[int(r)][:3] + "." for r in sorted(plan["rest"])) or "aucun"
+    rhythm = PLAN_INTENSITY.get(cfg.get("intensity") or "mid", PLAN_INTENSITY["mid"])["label"]
+    chips = "".join(f"<span style='--k:{PLAN_KIND_COLOR[k]}'>{PLAN_KIND_ICON[k]} {PLAN_KIND_NAME[k]}</span>"
+                    for k in ("summary", "reread", "flash", "quiz", "oral", "final"))
+    alerts = "".join(f"<div class='edt-alert'>⚠️ {_escape_html(a)}</div>" for a in plan["alerts"])
+    if alerts:
+        alerts = f"<div class='edt-alerts'>{alerts}</div>"
+    ai_lbl = " · ".join(lbl for lbl, v in PW_AI_CHOICES if v in ai) or "aucune fonction IA"
+    return (f"<div class='edt' data-weeks='{len(weeks)}'>"
+            f"<div class='edt-head'><div class='edt-id'><span class='edt-ctx'>{ctx}</span><b>{title}</b><small>{when}</small></div>"
+            f"<div class='edt-kpi'><b>{minutes} min</b><span>par jour · dès {_hm(day_start)}</span></div>"
+            f"<div class='edt-kpi'><b>{len(names)} matière(s)</b><span>Rythme {rhythm} · repos : {rest_lbl}</span></div>"
+            f"<div class='edt-kpi edt-pct'><span class='pl-ringw'>{ring}</span><span>du plan<br>terminé</span></div>"
+            "<div class='edt-acts'><button type='button' class='pl-btn pl-primary edt-edit'>Modifier le plan</button>"
+            "<button type='button' class='pl-btn edt-del'>Supprimer</button></div></div>"
+            f"{alerts}"
+            f"<div class='edt-bar'><button type='button' class='edt-nav edt-prev' aria-label='Semaine précédente'>‹</button>"
+            f"<b class='edt-wl'>{labels[0] if labels else ''}</b><button type='button' class='edt-nav edt-next' aria-label='Semaine suivante'>›</button>"
+            f"<div class='edt-legend'>{chips}</div></div>"
+            f"<div class='edt-weeks'>{''.join(weeks)}</div>"
+            f"<p class='edt-note'>Touchez une séance ou un jour pour voir le détail. {_escape_html(ai_lbl)} · "
+            "le plan se recalcule après chaque séance.</p></div>")
 
 
-def plan_set_minutes(value):
-    """Bouton « Ajuster le temps » : change les minutes par jour sans rouvrir le formulaire."""
-    try:
-        m = max(10, min(240, int(str(value).split(":")[0])))
-    except (TypeError, ValueError):
-        return gr.update(), gr.update()
-    space = _space()
-    if space.get("plan"):
-        space["plan"]["minutes"] = m
-        _space_save(space)
-    return plan_html(), m
+def _pw_view(step, error=""):
+    """Étape affichée de l'assistant (en-tête, colonnes, boutons)."""
+    step = max(1, min(5, int(step or 1)))
+    return (step, _pw_head(step), _pw_mascot(PW_POSES[step - 1]), *[gr.update(visible=step == i) for i in range(1, 6)],
+            gr.update(visible=step > 1), gr.update(visible=step < 5), gr.update(visible=step == 5), error)
 
 
-def plan_save(exam_date, exam_name, scope, minutes):
+def _pw_check(step, context, exam_date, docs, acts, rest):
+    """Message d'erreur si l'étape `step` est incomplète, sinon ''."""
+    if step == 2:
+        day = _parse_day(exam_date)
+        if context != "free" and not day:
+            return "⚠️ Choisis la date de ton examen." if context == "exam" else "⚠️ Choisis la date de ton contrôle."
+        if day and day < _date.today():
+            return "⚠️ Cette date est déjà passée : choisis une date à venir."
+    if step == 3:
+        if not [d for d in (docs or []) if d in documents_db]:
+            return "⚠️ Choisis au moins une matière parmi tes PDF." if documents_db else "⚠️ Importe d'abord un PDF dans « Mes dossiers »."
+        if not acts:
+            return "⚠️ Garde au moins une activité (notes, flashcards, quiz ou colle orale)."
+    if step == 4 and len(rest or []) >= 7:
+        return "⚠️ Garde au moins un jour de révision dans la semaine."
+    return ""
+
+
+def pw_next(step, context, exam_date, docs, acts, rest):
+    step = int(step or 1)
+    err = _pw_check(step, context, exam_date, docs, acts, rest)
+    return _pw_view(step if err else step + 1, err)
+
+
+def pw_prev(step):
+    return _pw_view(int(step or 1) - 1)
+
+
+def _pw_values(cfg):
+    """Valeurs des champs de l'assistant, pré-remplies avec le plan enregistré."""
+    docs = [d for d in (_plan_cfg_names(cfg) if _plan_ready(cfg) else []) if d in documents_db] or list(documents_db.keys())
+    return (gr.update(value=cfg.get("context") or "exam"), cfg.get("exam_name", ""), cfg.get("exam_date", ""),
+            int(cfg.get("minutes", 40) or 40), gr.update(value=cfg.get("start") or "18:00"),
+            gr.update(choices=_pw_doc_choices(), value=docs), gr.update(value=list(cfg.get("acts") or PLAN_ACTS)),
+            gr.update(value=cfg.get("intensity") or "mid"), gr.update(value=[str(r) for r in cfg.get("rest") or []]),
+            gr.update(value=list(cfg.get("ai") if cfg.get("ai") is not None else PW_DEFAULTS["ai"])))
+
+
+def _plan_open_view(force_wizard):
+    """Ouverture de l'onglet : l'emploi du temps s'il existe, sinon l'assistant (étape 1, champs pré-remplis)."""
+    cfg = _plan_cfg()
+    show_edt = _plan_ready(cfg) and not force_wizard
+    return (gr.update(visible=not show_edt), gr.update(visible=show_edt), plan_html() if show_edt else gr.update(),
+            *_pw_view(1), *_pw_values(cfg))
+
+
+def plan_open():
+    return _plan_open_view(False)
+
+
+def plan_edit():
+    return _plan_open_view(True)
+
+
+def pw_cancel():
+    """Annuler : retour à l'emploi du temps s'il existe, sinon l'assistant revient à l'étape 1."""
+    ready = _plan_ready()
+    return (gr.update(visible=not ready), gr.update(visible=ready), *_pw_view(1))
+
+
+def pw_generate(context, exam_name, exam_date, minutes, start, docs, acts, intensity, rest, ai):
+    for s in (2, 3, 4):
+        err = _pw_check(s, context, exam_date, docs, acts, rest)
+        if err:
+            return (gr.update(), gr.update(), gr.update(), *_pw_view(s, err))
     day = _parse_day(exam_date)
-    if not day:
-        return plan_html(), "⚠️ Saisissez la date de l'examen (jour / mois / année)."
-    if day < _date.today():
-        return plan_html(), "⚠️ Cette date est déjà passée : choisissez la date de votre prochain examen."
     space = _space()
     prev = space.get("plan") or {}
-    space["plan"] = {"exam_date": day.isoformat(), "exam_name": str(exam_name or "").strip()[:60], "scope": scope or "all",
-                     "minutes": max(10, min(240, int(minutes or 40))), "created": (prev.get("created") if prev.get("exam_date") == day.isoformat() else None) or _date.today().isoformat()}
+    docs = [d for d in docs if d in documents_db]
+    space["plan"] = {
+        "context": context if context in PLAN_CONTEXTS else "exam", "exam_name": str(exam_name or "").strip()[:60],
+        "exam_date": day.isoformat() if day else "", "docs": docs, "minutes": max(10, min(240, int(minutes or 40))),
+        "start": start if start in PW_START_CHOICES else "18:00", "acts": [a for a in acts if a in PLAN_ACTS],
+        "intensity": intensity if intensity in PLAN_INTENSITY else "mid", "rest": [r for r in rest or [] if r in "0123456"],
+        "ai": [a for a in ai or [] if a in PLAN_AI],
+        "created": (prev.get("created") if prev.get("exam_date") == (day.isoformat() if day else "") else None) or _date.today().isoformat(),
+    }
     _space_save(space)
-    _log("plan_save", detail=day.isoformat())
-    return plan_html(), "✅ Plan de révision mis à jour."
+    _log("plan_save", detail=f"{context} · {day.isoformat() if day else 'libre'} · {len(docs)} matière(s)")
+    return (gr.update(visible=False), gr.update(visible=True), plan_html(), *_pw_view(1, ""))
 
 
 def plan_clear():
     space = _space()
     space["plan"] = {}
     _space_save(space)
-    return plan_html(), "✅ Plan supprimé.", "", "", gr.update(value="all")
-
-
-def plan_open():
-    """À l'ouverture de l'onglet : formulaire rempli avec le plan enregistré."""
-    cfg = _space().get("plan") or {}
-    return (plan_html(), cfg.get("exam_date", ""), cfg.get("exam_name", ""),
-            gr.update(choices=_plan_scope_choices(), value=cfg.get("scope", "all")), int(cfg.get("minutes", 40) or 40), "")
+    return _plan_open_view(True)
 
 
 # ---------------- journal de révision
@@ -6282,107 +6494,206 @@ html:root:root:root:root body .progress-ring { background:conic-gradient(#4f6df5
 html:root:root:root:root body .global-metrics { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
 html:root:root:root:root body .global-metrics b { color:var(--ak-text)!important; }
 
-/* ===== Plan de révision : carte « Mon examen » cliquable (semaines repliables, cartes de séance) ===== */
-html:root:root:root:root body .pl-card { display:flex;flex-direction:column;gap:.85rem; }
-html:root:root:root:root body .pl-eyebrow { font-size:.72rem;font-weight:800;letter-spacing:.14em;color:var(--ak-muted); }
-html:root:root:root:root body .pl-head { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.85rem 1rem; }
-html:root:root:root:root body .pl-hc { display:flex;flex-direction:column;justify-content:center;gap:.15rem;min-width:0;padding-right:.6rem;border-right:1px solid var(--ak-line); }
-html:root:root:root:root body .pl-hc:last-child { border-right:0;padding-right:0; }
-html:root:root:root:root body .pl-hc > b { font-size:.98rem;color:var(--ak-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-html:root:root:root:root body .pl-hc > span { font-size:.76rem;color:var(--ak-muted);line-height:1.3; }
-html:root:root:root:root body .pl-hc > span b { color:var(--ak-text); }
-html:root:root:root:root body .pl-prog { flex-direction:row;align-items:center;justify-content:flex-start;gap:.6rem; }
+/* ===== Plan de révision : éléments communs (anneau, statuts, boutons) ===== */
 html:root:root:root:root body .pl-ringw { position:relative;width:2.9rem;height:2.9rem;flex:none;display:flex;align-items:center;justify-content:center; }
 html:root:root:root:root body .pl-ring { position:absolute;inset:0;width:100%;height:100%; }
 html:root:root:root:root body .pl-ring circle { fill:none;stroke-width:5; } html:root:root:root:root body .pl-ring-t { stroke:var(--ak-soft); } html:root:root:root:root body .pl-ring-v { stroke:#4f6df5;stroke-linecap:round; }
 html:root:root:root:root body .pl-ringw b { position:relative;font-size:.7rem;color:var(--ak-text); }
-html:root:root:root:root body .pl-week, html:root:root:root:root body .pl-theme { border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);overflow:hidden; }
-html:root:root:root:root body .pl-week > summary, html:root:root:root:root body .pl-theme > summary { list-style:none;display:flex;align-items:center;gap:.6rem;padding:.8rem 1rem;cursor:pointer;user-select:none; }
-html:root:root:root:root body .pl-week > summary::-webkit-details-marker, html:root:root:root:root body .pl-theme > summary::-webkit-details-marker { display:none; }
-html:root:root:root:root body .pl-week > summary b, html:root:root:root:root body .pl-theme > summary b { flex:1;min-width:0;color:var(--ak-text);font-size:.93rem; }
-html:root:root:root:root body .pl-week > summary span, html:root:root:root:root body .pl-theme > summary span { color:var(--ak-muted);font-size:.76rem;white-space:nowrap; }
-html:root:root:root:root body .pl-chev { width:.5rem;height:.5rem;flex:none;border-right:2px solid var(--ak-muted);border-bottom:2px solid var(--ak-muted);transform:rotate(45deg);transition:transform .2s ease;margin:0 .2rem -.1rem .2rem; }
-html:root:root:root:root body details[open] > summary .pl-chev { transform:rotate(-135deg);margin-bottom:-.3rem; }
-html:root:root:root:root body .pl-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;padding:0 1rem 1rem; }
-html:root:root:root:root body .pl-task { display:flex;flex-direction:column;gap:.5rem;min-width:0;border:1px solid var(--ak-line);border-radius:.9rem;padding:.75rem;background:color-mix(in srgb, var(--ak-soft) 45%, transparent);animation:akfade .35s ease both; }
-html:root:root:root:root body .pl-top { display:flex;gap:.65rem;align-items:flex-start; }
-html:root:root:root:root body .pl-ico { width:2.2rem;height:2.2rem;border-radius:.65rem;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--k) 20%, transparent);color:var(--k);font-size:1rem; }
-html:root:root:root:root body .pl-ico .ak-ico svg { width:1.05rem;height:1.05rem; }
-html:root:root:root:root body .pl-tt { min-width:0; } html:root:root:root:root body .pl-tt b { display:block;font-size:.86rem;line-height:1.3;color:var(--ak-text); }
-html:root:root:root:root body .pl-tt em { display:block;font-style:normal;font-size:.73rem;color:var(--ak-muted);margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-html:root:root:root:root body .pl-meta { display:flex;justify-content:space-between;align-items:center;gap:.4rem;flex-wrap:wrap; }
-html:root:root:root:root body .pl-min { font-size:.76rem;color:var(--ak-muted);display:inline-flex;align-items:center;gap:.25rem; }
-html:root:root:root:root body .pl-min .ak-ico svg { width:.85rem;height:.85rem; }
 html:root:root:root:root body .pl-st { font-size:.7rem;font-weight:700;padding:.16rem .6rem;border-radius:99px;white-space:nowrap; }
 html:root:root:root:root body .st-todo, html:root:root:root:root body .st-ok { background:rgba(46,163,131,.16);color:#2ea383; }
 html:root:root:root:root body .st-run { background:rgba(224,164,58,.18);color:#d4952a; }
 html:root:root:root:root body .st-opt { background:var(--ak-soft);color:var(--ak-muted); }
 html:root:root:root:root body .st-plan { background:rgba(79,109,245,.14);color:#6b84f7; }
-html:root:root:root:root body .pl-more { display:none; }
-html:root:root:root:root body .pl-task.open .pl-more { display:grid;gap:.3rem;font-size:.76rem;padding:.5rem .6rem;border-radius:.6rem;background:var(--ak-card); }
-html:root:root:root:root body .pl-more > div { display:flex;gap:.5rem;align-items:flex-start; } html:root:root:root:root body .pl-more > div > b { flex:none;min-width:3.8rem;color:var(--ak-muted);font-weight:600; }
-html:root:root:root:root body .pl-more > div > span { color:var(--ak-text);min-width:0; }
-html:root:root:root:root body .pl-btns { display:flex;gap:.45rem;margin-top:auto; }
 html:root:root:root:root body .pl-det, html:root:root:root:root body .pl-go { flex:1;min-width:0;border-radius:.6rem;padding:.45rem .5rem;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:filter .15s ease,background .15s ease; }
-html:root:root:root:root body .pl-det { background:transparent;border:1px solid var(--ak-line);color:var(--ak-text); }
-html:root:root:root:root body .pl-det:hover { background:var(--ak-soft); }
 html:root:root:root:root body .pl-go, html:root:root:root:root body.akori-dark .pl-go { background:#4f6df5!important;border:1px solid #4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; } html:root:root:root:root body .pl-go:hover { filter:brightness(1.1); }
-html:root:root:root:root body .pl-launched { flex:1;display:inline-flex;align-items:center;justify-content:center;gap:.25rem;font-size:.78rem;color:#2ea383; }
-html:root:root:root:root body .pl-sec { font-weight:800;color:var(--ak-text);font-size:.93rem;margin-top:.15rem; }
-html:root:root:root:root body .pl-prios { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem; }
-html:root:root:root:root body .pl-prio { display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--ak-line);border-radius:.9rem;background:var(--ak-card);padding:.65rem .85rem;min-width:0; }
-html:root:root:root:root body .pl-prio > i { width:.6rem;height:.6rem;border-radius:50%;margin-top:.35rem;flex:none; }
-html:root:root:root:root body .pr-0 > i { background:#e5484d; } html:root:root:root:root body .pr-1 > i { background:#e0a43a; } html:root:root:root:root body .pr-2 > i { background:#2ea383; }
-html:root:root:root:root body .pl-prio b { font-size:.85rem;color:var(--ak-text); } html:root:root:root:root body .pl-prio b span { font-weight:600;color:var(--ak-muted); }
-html:root:root:root:root body .pl-prio small { display:block;font-size:.74rem;color:var(--ak-muted);margin-top:.1rem; }
-html:root:root:root:root body .pl-theme-b { padding:0 1rem .9rem;font-size:.8rem;color:var(--ak-muted); } html:root:root:root:root body .pl-theme-b p { margin:0 0 .5rem; }
-html:root:root:root:root body .pl-cal, html:root:root:root:root body .pl-adjust { display:none; }
-html:root:root:root:root body .pl-card.cal-open .pl-cal { display:block;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.8rem;animation:akfade .25s ease both; }
-html:root:root:root:root body .pl-cal-h, html:root:root:root:root body .pl-cal-g { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.3rem; }
-html:root:root:root:root body .pl-cal-h { margin-bottom:.3rem; } html:root:root:root:root body .pl-cal-h span { text-align:center;font-size:.68rem;color:var(--ak-muted);text-transform:capitalize; }
-html:root:root:root:root body .pl-cd { display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.15rem;padding:.35rem .1rem;border-radius:.6rem;border:1px solid var(--ak-line);background:transparent;color:var(--ak-text);cursor:pointer;min-height:3.1rem;min-width:0; }
-html:root:root:root:root body .pl-cd b { font-size:.8rem; } html:root:root:root:root body .pl-cd small { font-size:.6rem;color:var(--ak-muted);white-space:nowrap; }
-html:root:root:root:root body .pl-dots { display:flex;gap:2px;min-height:6px;font-size:.7rem; } html:root:root:root:root body .pl-dots i { width:6px;height:6px;border-radius:50%; }
-html:root:root:root:root body .pl-cd.rest { opacity:.5; } html:root:root:root:root body .pl-cd.on { border-color:#4f6df5; } html:root:root:root:root body .pl-cd.sel { background:rgba(79,109,245,.14); }
-html:root:root:root:root body .pl-cd.exam { border-style:dashed;border-color:#e0a43a; } html:root:root:root:root body .pl-cd-x { visibility:hidden; }
-html:root:root:root:root body .pl-cal-detail { margin-top:.6rem;font-size:.78rem;color:var(--ak-muted); }
-html:root:root:root:root body .pl-cal-detail h4 { margin:0 0 .3rem;color:var(--ak-text);font-size:.84rem; } html:root:root:root:root body .pl-cal-detail ul { margin:0;padding-left:1.1rem; } html:root:root:root:root body .pl-cal-detail li { margin:.15rem 0;color:var(--ak-text); }
-html:root:root:root:root body .pl-cal-detail li em { color:var(--ak-muted);font-style:normal; } html:root:root:root:root body .pl-cal-detail p { margin:0; }
-html:root:root:root:root body .pl-card.adj-open .pl-adjust { display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.7rem .9rem;animation:akfade .25s ease both; }
-html:root:root:root:root body .pl-adjust > span { font-size:.8rem;color:var(--ak-muted);margin-right:.2rem; }
-html:root:root:root:root body .pl-mins { border:1px solid var(--ak-line);background:transparent;color:var(--ak-text);border-radius:99px;padding:.3rem .8rem;font-size:.78rem;cursor:pointer; }
-html:root:root:root:root body .pl-mins.on, html:root:root:root:root body.akori-dark .pl-mins.on { background:#4f6df5!important;border-color:#4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; }
-html:root:root:root:root body .pl-actions { display:flex;flex-wrap:wrap;gap:.6rem; }
 html:root:root:root:root body .pl-btn { flex:1 1 9rem;border-radius:.75rem;padding:.62rem 1rem;font-weight:700;font-size:.84rem;cursor:pointer;border:1px solid var(--ak-line);background:var(--ak-card);color:var(--ak-text);display:inline-flex;justify-content:center;align-items:center;gap:.35rem;transition:background .15s ease,filter .15s ease; }
 html:root:root:root:root body .pl-btn:hover { background:var(--ak-soft); }
 html:root:root:root:root body .pl-btn.pl-primary, html:root:root:root:root body.akori-dark .pl-btn.pl-primary { background:#4f6df5!important;border-color:#4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; } html:root:root:root:root body .pl-btn.pl-primary:hover { filter:brightness(1.1);background:#4f6df5; }
-html:root:root:root:root body .pl-card.cal-open .pl-cal-t, html:root:root:root:root body .pl-card.adj-open .pl-adj-t { border-color:#4f6df5; }
 html:root:root:root:root body .pl-btn .ak-ico svg { width:.95rem;height:.95rem; }
-html:root:root:root:root body .pl-card .plan-note { margin:0;font-size:.74rem; }
-html:root:root:root:root body .pl-cancel { display:none; }
-html:root:root:root:root body.plan-ready:not(.plan-editing) #plan-form-col { display:none!important; }
-html:root:root:root:root body.plan-ready.plan-editing .pl-cancel { display:inline-flex;float:right;margin-top:-1.7rem;border:1px solid var(--ak-line);background:transparent;color:var(--ak-muted);border-radius:99px;padding:.2rem .7rem;font-size:.75rem;cursor:pointer; }
-html:root:root:root:root body.ak-narrow .pl-head, html:root:root:root:root body.m-mode .pl-head { grid-template-columns:repeat(2,minmax(0,1fr)); }
-html:root:root:root:root body.ak-narrow .pl-hc:nth-child(2), html:root:root:root:root body.m-mode .pl-hc:nth-child(2) { border-right:0; }
-html:root:root:root:root body.m-mode .pl-grid, html:root:root:root:root body.m-mode .pl-prios { grid-template-columns:1fr; }
-html:root:root:root:root body.m-mode .pl-week > summary span { display:none; }
-html:root:root:root:root body.m-mode .pl-hc > b { white-space:normal;font-size:.9rem;line-height:1.25; } html:root:root:root:root body.m-mode .pl-det, html:root:root:root:root body.m-mode .pl-go { white-space:normal;font-size:.74rem;padding:.45rem .35rem; }
+html:root:root:root:root body.m-mode .pl-det, html:root:root:root:root body.m-mode .pl-go { white-space:normal;font-size:.74rem;padding:.45rem .35rem; }
 html:root:root:root:root body #upload-opts { gap:.6rem;flex-wrap:wrap; }
 html:root:root:root:root body.m-mode #upload-opts, html:root:root:root:root body.m-mode #upload-opts > .form { flex-direction:column!important;flex-wrap:nowrap!important; } html:root:root:root:root body.m-mode #upload-opts .block { width:100%!important;min-width:0!important;flex:1 1 auto!important; }
-html:root:root:root:root body.plan-editing .pl-head { grid-template-columns:repeat(2,minmax(0,1fr)); } html:root:root:root:root body.plan-editing .pl-hc:nth-child(2) { border-right:0; } html:root:root:root:root body.plan-editing .pl-grid, html:root:root:root:root body.plan-editing .pl-prios { grid-template-columns:1fr; } html:root:root:root:root body.plan-editing .pl-hc > b { white-space:normal; }
 html:root:root:root:root body .pl-det, html:root:root:root:root body .pl-go { white-space:normal!important;line-height:1.2; }
 html:root:root:root:root body .gradio-container button.pl-go.pl-go, html:root:root:root:root body.akori-dark .gradio-container button.pl-go.pl-go, html:root:root:root:root body .gradio-container button.pl-btn.pl-primary, html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-primary, html:root:root:root:root body .gradio-container button.pl-mins.pl-mins.on, html:root:root:root:root body.akori-dark .gradio-container button.pl-mins.pl-mins.on { background:#4f6df5!important;border:1px solid #4f6df5!important;color:#fff!important;-webkit-text-fill-color:#fff!important; }
-html:root:root:root:root body .gradio-container button.pl-det.pl-det, html:root:root:root:root body.akori-dark .gradio-container button.pl-det.pl-det, html:root:root:root:root body .gradio-container button.pl-mins.pl-mins:not(.on), html:root:root:root:root body.akori-dark .gradio-container button.pl-mins.pl-mins:not(.on), html:root:root:root:root body .gradio-container button.pl-cd.pl-cd, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd, html:root:root:root:root body .gradio-container button.pl-showall.pl-showall, html:root:root:root:root body.akori-dark .gradio-container button.pl-showall.pl-showall { background:transparent!important;color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;border:1px solid var(--ak-line)!important; }
-html:root:root:root:root body .gradio-container button.pl-showall.pl-showall, html:root:root:root:root body.akori-dark .gradio-container button.pl-showall.pl-showall { border-style:dashed!important;color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important; }
 html:root:root:root:root body .gradio-container button.pl-btn.pl-btn:not(.pl-primary), html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-btn:not(.pl-primary) { background:var(--ak-card)!important;color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;border:1px solid var(--ak-line)!important; }
 html:root:root:root:root body .gradio-container button.pl-det.pl-det:hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-det.pl-det:hover, html:root:root:root:root body .gradio-container button.pl-btn.pl-btn:not(.pl-primary):hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-btn:not(.pl-primary):hover, html:root:root:root:root body .gradio-container button.pl-mins.pl-mins:not(.on):hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-mins.pl-mins:not(.on):hover { background:var(--ak-soft)!important; }
-html:root:root:root:root body .gradio-container button.pl-cd.pl-cd.sel, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd.sel { background:rgba(79,109,245,.14)!important; } html:root:root:root:root body .gradio-container button.pl-cd.pl-cd.on, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd.on { border-color:#4f6df5!important; } html:root:root:root:root body .gradio-container button.pl-cd.pl-cd.exam, html:root:root:root:root body.akori-dark .gradio-container button.pl-cd.pl-cd.exam { border:1px dashed #e0a43a!important; }
-html:root:root:root:root body .gradio-container button.pl-card .pl-cd-x, html:root:root:root:root body.akori-dark .gradio-container button.pl-card .pl-cd-x { visibility:hidden; }
-html:root:root:root:root body .gradio-container button.pl-cancel.pl-cancel, html:root:root:root:root body.akori-dark .gradio-container button.pl-cancel.pl-cancel { background:transparent!important;color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important;border:1px solid var(--ak-line)!important; }
 html:root:root:root:root body .gradio-container button.pl-go.pl-go:hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-go.pl-go:hover, html:root:root:root:root body .gradio-container button.pl-btn.pl-primary:hover, html:root:root:root:root body.akori-dark .gradio-container button.pl-btn.pl-primary:hover { filter:brightness(1.1); }
-html:root:root:root:root body .pl-extra { display:none!important; } html:root:root:root:root body .pl-grid.all .pl-extra { display:flex!important; } html:root:root:root:root body .pl-grid.all .pl-showall { display:none; }
-html:root:root:root:root body .pl-showall { grid-column:1 / -1;border:1px dashed var(--ak-line)!important;background:transparent!important;color:var(--ak-muted)!important;border-radius:.8rem;padding:.55rem;font-size:.8rem;font-weight:700;cursor:pointer; } html:root:root:root:root body .pl-showall:hover { color:var(--ak-text)!important; }
+/* ===== Plan de révision : assistant en 5 étapes (carte bleue, mascotte, boutons arrondis) ===== */
+html:root:root:root:root body #plan-wizard { position:relative;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:.7rem!important;
+  min-height:calc(var(--body-h, 600px) - 2rem);padding:1rem 1.4rem 1.1rem!important;border-radius:1.4rem!important;overflow:hidden;color:#eef4ff;
+  background:radial-gradient(50rem 26rem at 85% -12%, rgba(120,175,255,.38), transparent 60%), linear-gradient(160deg,#21479b 0%,#16357a 48%,#0f2558 100%)!important;
+  border:1px solid rgba(140,185,255,.28)!important;box-shadow:0 18px 50px rgba(15,36,87,.32)!important; }
+html:root:root:root:root body #plan-wizard .block, html:root:root:root:root body #plan-wizard .form, html:root:root:root:root body #plan-wizard fieldset,
+html:root:root:root:root body #plan-wizard .wrap, html:root:root:root:root body #plan-wizard .html-container, html:root:root:root:root body #plan-wizard .prose,
+html:root:root:root:root body #plan-wizard .container, html:root:root:root:root body #plan-wizard .input-container, html:root:root:root:root body #plan-wizard .column, html:root:root:root:root body #plan-wizard .row {
+  background:transparent!important;border-color:transparent!important;box-shadow:none!important; }
+html:root:root:root:root body #plan-wizard .html-container, html:root:root:root:root body #plan-wizard .prose { padding:0!important; }
+.pw-head { position:relative;text-align:center;padding-top:.2rem; }
+.pw-bar { height:.38rem;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;margin-right:8.5rem; }
+.pw-bar i { display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7cc4ff,#4f7bff);box-shadow:0 0 12px rgba(124,196,255,.7);transition:width .45s cubic-bezier(.2,.8,.2,1); }
+.pw-brand { position:absolute;top:-.35rem;right:0;font-size:.95rem;font-weight:600;color:#e3ecff; }
+html:root:root:root:root body .pw-head h2 { margin:.9rem 0 .2rem!important;font-size:clamp(1.25rem, 1rem + 1vw, 1.7rem);font-weight:800;letter-spacing:.02em;color:#fff!important;animation:akfade .35s ease both; }
+html:root:root:root:root body .pw-head p { margin:0!important;color:#c9d8ff!important;font-size:.98rem; }
+html:root:root:root:root body #pw-stage { flex:1 1 auto!important;display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:center!important;gap:clamp(.8rem, 3vw, 2.5rem)!important; }
+html:root:root:root:root body #pw-mascot { flex:0 0 clamp(6.5rem, 14vw, 10rem)!important;width:clamp(6.5rem, 14vw, 10rem)!important;min-width:0!important; }
+html:root:root:root:root body #pw-fields { flex:0 1 34rem!important;max-width:34rem;gap:.6rem!important; }
+html:root:root:root:root body .pw-step { gap:.7rem!important;animation:akfade .35s ease both; }
+.pw-mascot { width:100%;height:auto;display:block;filter:drop-shadow(0 12px 20px rgba(5,15,50,.45));animation:pwbob 3.2s ease-in-out infinite; }
+@keyframes pwbob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+.pw-mascot .mc-arms path { fill:none;stroke:#3d8cff;stroke-width:10;stroke-linecap:round; }
+.pw-mascot .mc-hand { fill:#4f9bff; } .pw-mascot .mc-leg { stroke:#2a6be0;stroke-width:9;stroke-linecap:round;fill:none; }
+.pw-mascot .mc-eye { fill:#0d1f4f; } .pw-mascot .mc-mouth, .pw-mascot .mc-brow { fill:none;stroke:#0d1f4f;stroke-width:4;stroke-linecap:round; }
+.pw-mascot .mc-scroll text { font:800 11px Inter,system-ui,sans-serif;fill:#1d2b53; } .pw-mascot .mc-dots circle { fill:rgba(255,255,255,.75); }
+/* libellés et champs dans la carte bleue */
+html:root:root:root:root body #plan-wizard label > span, html:root:root:root:root body #plan-wizard [data-testid="block-info"], html:root:root:root:root body #plan-wizard legend,
+html:root:root:root:root body #plan-wizard .block-title, html:root:root:root:root body #plan-wizard .label-wrap span { color:#e3ecff!important;-webkit-text-fill-color:#e3ecff!important;font-weight:700!important;background:transparent!important; }
+html:root:root:root:root body #plan-wizard .info, html:root:root:root:root body #plan-wizard [data-testid="block-info"] + div, html:root:root:root:root body #plan-wizard .gr-info { color:#b6c7f0!important;-webkit-text-fill-color:#b6c7f0!important; }
+html:root:root:root:root body #plan-wizard input[type="text"], html:root:root:root:root body #plan-wizard input[type="number"], html:root:root:root:root body #plan-wizard textarea,
+html:root:root:root:root body #plan-wizard .ak-datepick, html:root:root:root:root body #plan-wizard .wrap-inner, html:root:root:root:root body #plan-wizard .secondary-wrap {
+  background:rgba(8,22,64,.55)!important;border:1px solid rgba(150,190,255,.35)!important;border-radius:.75rem!important;color:#fff!important;-webkit-text-fill-color:#fff!important;color-scheme:dark; }
+html:root:root:root:root body #plan-wizard .secondary-wrap input, html:root:root:root:root body #plan-wizard .wrap-inner input { background:transparent!important;border:0!important; }
+html:root:root:root:root body #plan-wizard input::placeholder, html:root:root:root:root body #plan-wizard textarea::placeholder { color:#8fa6d8!important;-webkit-text-fill-color:#8fa6d8!important; }
+html:root:root:root:root body #plan-wizard input:focus, html:root:root:root:root body #plan-wizard textarea:focus, html:root:root:root:root body #plan-wizard .ak-datepick:focus { border-color:#9cc6ff!important;box-shadow:0 0 0 3px rgba(124,196,255,.22)!important; }
+html:root:root:root:root body #plan-wizard input[type="range"] { accent-color:#7cc4ff; }
+html:root:root:root:root body #plan-wizard .token { background:rgba(79,123,255,.35)!important;color:#fff!important;border:1px solid rgba(160,195,255,.4)!important;border-radius:99px!important; }
+html:root:root:root:root body #plan-wizard .token * { color:#fff!important;-webkit-text-fill-color:#fff!important; }
+html:root:root:root:root body #plan-wizard .token-remove, html:root:root:root:root body #plan-wizard .remove-all { background:rgba(255,255,255,.16)!important;border:0!important;color:#fff!important;box-shadow:none!important; }
+html:root:root:root:root body #plan-wizard ul.options { background:#13306f!important;border:1px solid rgba(150,190,255,.35)!important;border-radius:.75rem!important; }
+html:root:root:root:root body #plan-wizard ul.options li { color:#eef4ff!important;background:transparent!important; } html:root:root:root:root body #plan-wizard ul.options li:hover, html:root:root:root:root body #plan-wizard ul.options li.active { background:rgba(124,196,255,.2)!important; }
+/* cases à cocher et boutons radio en tuiles */
+html:root:root:root:root body #plan-wizard .pw-step .wrap { display:flex!important;flex-wrap:wrap!important;gap:.5rem!important; }
+html:root:root:root:root body #plan-wizard .pw-step .wrap > label { margin:0!important;display:flex!important;align-items:center!important;gap:.55rem!important;cursor:pointer;
+  background:rgba(8,22,64,.45)!important;border:1px solid rgba(150,190,255,.3)!important;border-radius:.75rem!important;padding:.6rem .85rem!important;color:#eef4ff!important;
+  transition:background .15s,border-color .15s,transform .15s; }
+html:root:root:root:root body #plan-wizard .pw-step .wrap > label span { color:#eef4ff!important;-webkit-text-fill-color:#eef4ff!important; }
+html:root:root:root:root body #plan-wizard .pw-step .wrap > label:hover { border-color:#9cc6ff!important;transform:translateY(-1px); }
+html:root:root:root:root body #plan-wizard .pw-step .wrap > label:has(input:checked) { background:rgba(79,123,255,.45)!important;border-color:#9cc6ff!important; }
+html:root:root:root:root body #plan-wizard .pw-step input[type="checkbox"], html:root:root:root:root body #plan-wizard .pw-step input[type="radio"] { accent-color:#4f7bff;width:1.05rem;height:1.05rem;flex:none;
+  background-color:rgba(8,22,64,.6)!important;border:1.5px solid rgba(170,200,255,.6)!important; }
+html:root:root:root:root body #plan-wizard .pw-step input[type="checkbox"]:checked, html:root:root:root:root body #plan-wizard .pw-step input[type="radio"]:checked { background-color:#7cc4ff!important;border-color:#7cc4ff!important; }
+html:root:root:root:root body #plan-wizard #pw-intensity .wrap > label input:checked { background:#fff!important; }
+html:root:root:root:root body #pw-acts .wrap, html:root:root:root:root body #pw-ai .wrap { flex-direction:column!important;flex-wrap:nowrap!important; }
+/* étape 1 : contexte en pastilles */
+html:root:root:root:root body #plan-wizard #pw-context .wrap { flex-wrap:nowrap!important;justify-content:center!important;background:rgba(8,22,64,.45)!important;border:1px solid rgba(150,190,255,.3)!important;border-radius:99px!important;padding:.3rem!important;gap:.25rem!important; }
+html:root:root:root:root body #plan-wizard #pw-context .wrap > label { border-radius:99px!important;border-color:transparent!important;background:transparent!important;padding:.55rem .9rem!important;white-space:nowrap; }
+html:root:root:root:root body.m-mode #plan-wizard #pw-context .wrap, html:root:root:root:root body.ak-narrow #plan-wizard #pw-context .wrap { flex-wrap:wrap!important;border-radius:1.2rem!important; }
+html:root:root:root:root body #plan-wizard #pw-context .wrap > label:has(input:checked) { background:linear-gradient(135deg,#3f7bff,#2f5fe0)!important;box-shadow:0 6px 18px rgba(47,95,224,.45); }
+/* étape 4 : intensité comme un curseur à trois crans, jours de repos en pastilles */
+html:root:root:root:root body #plan-wizard #pw-intensity .wrap { position:relative;display:grid!important;grid-template-columns:repeat(3,1fr);gap:0!important;padding-top:1.4rem!important; }
+html:root:root:root:root body #pw-intensity .wrap::before { content:"";position:absolute;left:16.6%;right:16.6%;top:.55rem;height:.3rem;border-radius:99px;background:rgba(255,255,255,.2); }
+html:root:root:root:root body #plan-wizard #pw-intensity .wrap > label { flex-direction:column!important;justify-content:center;background:transparent!important;border:0!important;padding:.2rem!important;font-weight:600; }
+html:root:root:root:root body #pw-intensity .wrap > label input { position:absolute;top:.25rem;width:1rem!important;height:1rem!important;appearance:none;-webkit-appearance:none;border-radius:50%;
+  background:#9db8ef;border:2px solid #16357a;margin:0!important; }
+html:root:root:root:root body #pw-intensity .wrap > label { position:relative; }
+html:root:root:root:root body #pw-intensity .wrap > label input { top:-1.2rem; }
+html:root:root:root:root body #pw-intensity .wrap > label:has(input:checked) input { background:#fff;width:1.35rem!important;height:1.35rem!important;top:-1.38rem;box-shadow:0 0 0 4px rgba(124,196,255,.45); }
+html:root:root:root:root body #pw-intensity .wrap > label:has(input:checked) span { color:#fff!important;font-weight:800; }
+html:root:root:root:root body #plan-wizard #pw-rest .wrap > label { padding:.45rem .7rem!important;min-width:3.3rem;justify-content:center; }
+.pw-ai-help { font-size:.82rem;line-height:1.45;color:#c9d8ff;border-left:3px solid rgba(124,196,255,.5);padding-left:.75rem; }
+html:root:root:root:root body .pw-ai-help p { margin:.15rem 0!important;color:#c9d8ff!important; } html:root:root:root:root body .pw-ai-help b { color:#fff!important; }
+html:root:root:root:root body #plan-wizard #plan-status p { color:#ffd0d0!important;-webkit-text-fill-color:#ffd0d0!important;margin:0!important;font-weight:600; }
+/* boutons de navigation */
+html:root:root:root:root body #pw-nav { display:flex!important;flex-wrap:wrap!important;justify-content:flex-end!important;align-items:center!important;gap:.7rem!important;flex:none!important; }
+html:root:root:root:root body #pw-nav > button { flex:0 0 auto!important;width:auto!important;min-height:2.85rem!important;border-radius:99px!important;padding:0 1.6rem!important;font-weight:700!important;font-size:.98rem!important; }
+html:root:root:root:root body #plan-wizard button#pw-prev { margin-right:auto!important;background:transparent!important;border:0!important;color:#fff!important;-webkit-text-fill-color:#fff!important;box-shadow:none!important;padding:0 .6rem!important; }
+html:root:root:root:root body #plan-wizard button#pw-cancel { background:#dbe7ff!important;border:0!important;color:#163a86!important;-webkit-text-fill-color:#163a86!important;box-shadow:0 4px 14px rgba(0,0,0,.18)!important; }
+html:root:root:root:root body #plan-wizard button#pw-next { background:linear-gradient(135deg,#3f7bff,#2f5fe0)!important;border:0!important;color:#fff!important;-webkit-text-fill-color:#fff!important;box-shadow:0 6px 18px rgba(47,95,224,.45)!important; }
+html:root:root:root:root body #plan-wizard button#pw-gen { background:#0b1a44!important;border:1.5px solid #6fb2ff!important;color:#fff!important;-webkit-text-fill-color:#fff!important;letter-spacing:.04em;
+  text-transform:uppercase;box-shadow:0 0 0 3px rgba(111,178,255,.18), 0 0 22px rgba(111,178,255,.55)!important;animation:pwglow 2.2s ease-in-out infinite; }
+@keyframes pwglow { 50% { box-shadow:0 0 0 5px rgba(111,178,255,.12), 0 0 32px rgba(111,178,255,.75); } }
+html:root:root:root:root body #plan-wizard button:hover { filter:brightness(1.08); }
+html:root:root:root:root body #pw-mascot:has(.pw-right) { order:2; }
+html:root:root:root:root body.m-mode #pw-stage, html:root:root:root:root body.ak-narrow #pw-stage { flex-direction:column!important; }
+html:root:root:root:root body.m-mode #pw-mascot, html:root:root:root:root body.ak-narrow #pw-mascot { flex-basis:5.5rem!important;width:5.5rem!important; }
+html:root:root:root:root body.m-mode #pw-fields, html:root:root:root:root body.ak-narrow #pw-fields { flex-basis:auto!important;width:100%!important; }
+html:root:root:root:root body.m-mode #plan-wizard { padding:.9rem .9rem 1rem!important; } html:root:root:root:root body.m-mode .pw-bar { margin-right:0; } html:root:root:root:root body.m-mode .pw-brand { display:none; }
+html:root:root:root:root body.m-mode #pw-nav > button { padding:0 1rem!important;flex:1 1 auto!important; } html:root:root:root:root body.m-mode #plan-wizard button#pw-prev { flex:0 0 auto!important; }
 
+/* ===== Plan de révision : emploi du temps intelligent ===== */
+html:root:root:root:root body #plan-edt, html:root:root:root:root body #plan-edt > .block, html:root:root:root:root body #plan-edt .html-container { padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important; }
+.edt { display:flex;flex-direction:column;gap:.6rem;height:calc(var(--body-h, 600px) - 2rem);min-height:26rem; }
+.edt-head { display:grid;grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr)) auto;gap:.6rem;align-items:center;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);padding:.65rem .9rem; }
+.edt-id { display:flex;flex-direction:column;min-width:0; } .edt-id b { font-size:1rem;color:var(--ak-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; } .edt-id small { color:var(--ak-muted);font-size:.76rem; }
+.edt-ctx { align-self:flex-start;font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:.12rem .55rem;border-radius:99px;background:rgba(79,109,245,.14);color:#6b84f7;margin-bottom:.15rem; }
+.edt-kpi { display:flex;flex-direction:column;min-width:0;padding-left:.7rem;border-left:1px solid var(--ak-line); } .edt-kpi b { font-size:.92rem;color:var(--ak-text); } .edt-kpi span { font-size:.72rem;color:var(--ak-muted); }
+.edt-pct { flex-direction:row;align-items:center;gap:.5rem; }
+.edt-acts { display:flex;gap:.4rem; } html:root:root:root:root body #plan-edt .edt-acts .pl-btn { flex:0 0 auto;padding:.5rem .85rem;font-size:.78rem; }
+.edt-alerts { display:grid;gap:.35rem; } .edt-alert { border-radius:.75rem;padding:.5rem .8rem;font-size:.8rem;background:rgba(224,164,58,.15);border:1px solid rgba(224,164,58,.4);color:var(--ak-text); }
+.edt-bar { display:flex;align-items:center;gap:.5rem;flex-wrap:wrap; } .edt-wl { font-size:.92rem;color:var(--ak-text);min-width:14rem;text-align:center; }
+html:root:root:root:root body #plan-edt button.edt-nav { width:2.1rem!important;height:2.1rem!important;min-height:0!important;border-radius:50%!important;padding:0!important;font-size:1.3rem!important;line-height:1!important;
+  border:1px solid var(--ak-line)!important;background:var(--ak-card)!important;color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;cursor:pointer; }
+html:root:root:root:root body #plan-edt button.edt-nav:disabled { opacity:.35;cursor:default; }
+.edt-legend { margin-left:auto;display:flex;flex-wrap:wrap;gap:.35rem; }
+.edt-legend > span { font-size:.68rem;color:var(--ak-muted);padding:.12rem .5rem;border-radius:99px;border:1px solid var(--ak-line);display:inline-flex;align-items:center;gap:.25rem; }
+.edt-legend > span { border-color:color-mix(in srgb, var(--k) 45%, var(--ak-line)); } .edt-legend .ak-ico { color:var(--k);margin-right:.15rem; }
+.eb-t .ak-ico { margin-right:.2rem;width:.85rem;height:.85rem; }
+.edt-weeks { position:relative;flex:1 1 auto;min-height:0;border:1px solid var(--ak-line);border-radius:1rem;background:var(--ak-card);overflow:hidden;touch-action:pan-y; }
+.edt-week { display:none;height:100%;grid-template-columns:3rem repeat(7,minmax(0,1fr)); }
+.edt-week.on { display:grid;animation:akfade .3s ease both; }
+.edt-hours { position:relative;margin:2.8rem 0 .4rem; }
+.edt-hours span { position:absolute;right:.35rem;transform:translateY(-50%);font-size:.62rem;color:var(--ak-muted);font-variant-numeric:tabular-nums; }
+.edt-hours span:first-child { transform:none; }
+.edt-col { display:flex;flex-direction:column;min-width:0;border-left:1px solid var(--ak-line); }
+html:root:root:root:root body #plan-edt .edt-dh { height:2.8rem!important;min-height:0!important;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0!important;
+  border:0!important;border-bottom:1px solid var(--ak-line)!important;border-radius:0!important;background:transparent!important;color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important;
+  font-size:.7rem!important;font-weight:600!important;cursor:pointer;box-shadow:none!important; }
+html:root:root:root:root body #plan-edt div.edt-dh { cursor:default; }
+html:root:root:root:root body #plan-edt .edt-dh b { font-size:.95rem;color:var(--ak-text);-webkit-text-fill-color:var(--ak-text);line-height:1.2; }
+html:root:root:root:root body #plan-edt .edt-dh small { font-size:.58rem; }
+html:root:root:root:root body #plan-edt button.edt-dh:hover { background:var(--ak-soft)!important; }
+html:root:root:root:root body #plan-edt .edt-col.today .edt-dh b { background:#4f6df5;color:#fff;-webkit-text-fill-color:#fff;border-radius:99px;padding:0 .4rem; }
+html:root:root:root:root body #plan-edt .edt-col.over .edt-dh small { color:#e5484d;-webkit-text-fill-color:#e5484d;font-weight:800; }
+.edt-body { position:relative;flex:1 1 auto;margin:0 .2rem .4rem;
+  background:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--tick, 25%) - 1px), color-mix(in srgb, var(--ak-line) 70%, transparent) calc(var(--tick, 25%) - 1px), color-mix(in srgb, var(--ak-line) 70%, transparent) var(--tick, 25%)); }
+.edt-col.today .edt-body { background-color:rgba(79,109,245,.05); }
+.edt-col.off { opacity:.4; } .edt-col.off .edt-body { background:none; }
+.edt-col.rest .edt-body { background:repeating-linear-gradient(45deg, transparent 0 7px, var(--ak-soft) 7px 14px);border-radius:.6rem;display:flex;align-items:center;justify-content:center; }
+.edt-rest { font-size:.7rem;font-weight:700;color:var(--ak-muted);writing-mode:vertical-rl;letter-spacing:.2em;text-transform:uppercase; }
+html:root:root:root:root body #plan-edt .edt-blk { position:absolute;left:0;right:0;min-height:1.3rem!important;margin:0!important;padding:.18rem .35rem!important;border:0!important;border-left:3px solid var(--k)!important;
+  border-radius:.5rem!important;background:color-mix(in srgb, var(--k) 20%, var(--ak-card))!important;color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;
+  display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:.02rem;overflow:hidden;text-align:left;cursor:pointer;font-size:.66rem!important;font-weight:500!important;line-height:1.2;
+  box-shadow:0 1px 0 rgba(0,0,0,.04)!important;transition:transform .15s ease, box-shadow .15s ease;animation:akfade .35s ease both; }
+html:root:root:root:root body #plan-edt .edt-blk:hover { transform:scale(1.04);z-index:3;box-shadow:0 8px 20px rgba(0,0,0,.18)!important; }
+.edt-blk > span { display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.eb-t { font-weight:800;font-size:.68rem; } .eb-s { opacity:.85; } .eb-h { opacity:.65;font-variant-numeric:tabular-nums; }
+.edt-blk.sm .eb-s, .edt-blk.sm .eb-h { display:none; }
+html:root:root:root:root body #plan-edt .edt-blk.done { opacity:.55; } .edt-blk.done .eb-t::after { content:" ✓"; }
+html:root:root:root:root body #plan-edt .edt-exam { position:absolute;inset:0;margin:0!important;border:1.5px dashed #e0a43a!important;border-radius:.6rem!important;background:rgba(224,164,58,.14)!important;
+  color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;font-size:1.3rem!important;cursor:pointer;box-shadow:none!important; }
+.edt-exam span { font-size:.72rem;font-weight:800; }
+.edt-note { margin:0!important;font-size:.72rem;color:var(--ak-muted)!important; }
+html:root:root:root:root body.ak-short .edt, html:root:root:root:root body.m-mode .edt { height:auto; } html:root:root:root:root body.ak-short .edt-weeks, html:root:root:root:root body.m-mode .edt-weeks { height:30rem;flex:none; }
+html:root:root:root:root body.ak-narrow .edt-head, html:root:root:root:root body.m-mode .edt-head { grid-template-columns:repeat(2,minmax(0,1fr)); }
+html:root:root:root:root body.ak-narrow .edt-id, html:root:root:root:root body.m-mode .edt-id, html:root:root:root:root body.ak-narrow .edt-acts, html:root:root:root:root body.m-mode .edt-acts { grid-column:1 / -1; }
+html:root:root:root:root body.ak-narrow .edt-kpi:nth-child(2), html:root:root:root:root body.m-mode .edt-kpi:nth-child(2) { padding-left:0;border-left:0; }
+html:root:root:root:root body.ak-narrow .edt-legend, html:root:root:root:root body.m-mode .edt-legend { display:none; }
+html:root:root:root:root body.m-mode .edt-week { grid-template-columns:2.3rem repeat(7,minmax(0,1fr)); }
+html:root:root:root:root body.m-mode #plan-edt .edt-blk { padding:.12rem .15rem!important; } html:root:root:root:root body.m-mode .edt-blk .eb-s, html:root:root:root:root body.m-mode .edt-blk .eb-h { display:none; }
+html:root:root:root:root body.m-mode .edt-wl { min-width:0;flex:1;font-size:.8rem; }
+html:root:root:root:root body.m-mode .edt-blk .eb-t { font-size:0!important;text-align:center; } html:root:root:root:root body.m-mode .edt-blk .eb-t .ak-ico { margin:0;width:.95rem;height:.95rem; }
+/* fenêtre de détail (séance, jour, examen) */
+body > .edt-modal { position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(8,12,28,.55);backdrop-filter:blur(4px);animation:akfade .18s ease both; }
+.edt-mbox { position:relative;width:min(30rem,100%);max-height:86vh;overflow:auto;border-radius:1.2rem;background:var(--ak-card, #fff);border:1px solid var(--ak-line, #e4e9f2);
+  box-shadow:0 30px 80px rgba(0,0,0,.35);padding:1.2rem 1.3rem;color:var(--ak-text, #182033);animation:akrise .25s ease both; }
+.edt-mclose { position:absolute;top:.7rem;right:.7rem;width:2rem;height:2rem;border-radius:50%;border:1px solid var(--ak-line, #e4e9f2);background:var(--ak-soft, #eef2ff);color:var(--ak-text, #182033);cursor:pointer; }
+.ed-card { display:flex;flex-direction:column;gap:.8rem; }
+.ed-top { display:flex;gap:.8rem;align-items:center;padding-right:2rem; }
+.ed-ico { width:2.8rem;height:2.8rem;border-radius:.8rem;flex:none;display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:color-mix(in srgb, var(--k) 22%, transparent);color:var(--k); }
+.ed-ico .ak-ico { width:1.3rem;height:1.3rem;margin:0; }
+.ed-top small { font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--k); }
+.ed-top h3 { margin:.1rem 0 0;font-size:1.05rem;line-height:1.3;color:var(--ak-text, #182033); }
+.ed-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem; }
+.ed-grid > div { background:var(--ak-soft, #eef2ff);border-radius:.7rem;padding:.5rem .65rem;min-width:0; }
+.ed-grid span { display:block;font-size:.68rem;color:var(--ak-muted, #69758b); } .ed-grid b { font-size:.85rem;color:var(--ak-text, #182033); }
+.ed-grid i { font-style:normal; }
+.ed-why { border-left:3px solid var(--k);padding:.1rem 0 .1rem .75rem;font-size:.85rem; } .ed-why b { color:var(--ak-text, #182033); }
+.ed-why p { margin:.2rem 0 0;color:var(--ak-muted, #69758b);line-height:1.45; } .ed-why.warn { border-color:#e5484d; }
+.ed-pages b { font-size:.82rem; } .ed-pages .plan-pages { margin-top:.35rem; }
+.ed-day { list-style:none;margin:0;padding:0;display:grid;gap:.4rem; }
+.ed-day li { display:grid;grid-template-columns:auto 1fr;gap:.1rem .6rem;padding:.5rem .65rem;border-radius:.7rem;background:var(--ak-soft, #eef2ff);border-left:3px solid var(--k); }
+.ed-day em { font-style:normal;font-size:.75rem;font-weight:700;color:var(--ak-muted, #69758b);font-variant-numeric:tabular-nums;grid-row:span 2; }
+.ed-day span { font-size:.84rem;color:var(--ak-text, #182033); } .ed-day small { font-size:.72rem;color:var(--ak-muted, #69758b); }
+.ed-acts:empty { display:none; } .ed-acts .pl-go { width:100%;padding:.7rem!important;font-size:.88rem!important;border-radius:.8rem!important; }
 """
 
 
@@ -6409,6 +6720,27 @@ I18N_SRC = r"""
   I18N.push(["Mes documents", "My documents"],["Modules · semestres", "Modules · semesters"],["Ajouter des PDF", "Add PDFs"],["Ranger les nouveaux PDF dans le module", "Put new PDFs in the module"],["Nouveau module", "New module"],["Supprimer", "Delete"],["Corriger", "Check"],["Dicter", "Dictate"],["Nouvelle question", "New question"],["Votre réponse", "Your answer"],["Écrivez ou dictez votre réponse…", "Type or dictate your answer…"],["La correction s'affichera ici.", "The correction will appear here."],["Note sur 10, points manquants et page à relire.", "Mark out of 10, missing points and page to reread."],["✦ Générer le résumé", "✦ Generate summary"],["Les points clés du cours actif, conservés avec le document.", "Key points of the active course, saved with the document."],["Vue d'ensemble", "Overview"],["Cours actif", "Active course"],["Mon examen", "My exam"],["Cours concernés", "Courses included"],["Minutes par jour", "Minutes per day"],["Mon journal de révision", "My revision journal"],["Thème clair ou sombre.", "Light or dark theme."],["Interface et réponses de l'IA.", "Interface and AI answers."],["Que voulez-vous faire ?", "What do you want to do?"],["Touchez une fonction pour voir comment elle marche.", "Tap a feature to see how it works."],["Cours importés", "Imported courses"],["Passages indexés (cours actif)", "Indexed passages (active course)"],["Questions posées (cours actif)", "Questions asked (active course)"],["Progression du cours actif", "Active course progress"],["AKORI · Espace de révision", "AKORI · Revision space"],["Vos cours,", "Your courses,"],["votre réussite", "your success"],["Un assistant de révision qui ne répond qu'avec vos propres documents.", "A revision assistant that answers only from your own documents."],["E-mail", "Email"],["Entrez votre adresse e-mail", "Enter your email address"],["Votre mot de passe", "Your password"],["Continuer", "Continue"],["OU", "OR"],["Créer un compte", "Create an account"],["J'ai déjà un compte", "I already have an account"],["Découvrir AKORI", "Discover AKORI"],["Comptes récents", "Recent accounts"],["Autre compte", "Other account"],["Une adresse réelle que vous consultez.", "A real address you check."],["Retapez le mot de passe", "Retype the password"],["Vos documents restent dans votre espace personnel. AKORI ne répond qu'à partir de vos cours.", "Your documents stay in your personal space. AKORI answers only from your courses."]);
   I18N.push(["Aucune activité pour le moment.", "No activity yet."],["Vos quiz, flashcards, colles orales, questions et résumés apparaîtront ici.", "Your quizzes, flashcards, orals, questions and summaries will appear here."],["Posez votre question…", "Ask your question…"],["Résumé généré", "Summary generated"],["Carte mentale générée", "Mind map generated"],["Question à l'assistant", "Question to the assistant"]);
   I18N.push(["Titre du cours (facultatif)", "Course title (optional)"],["Ranger dans le module", "File into module"],["MON EXAMEN", "MY EXAM"],["Priorités du plan", "Plan priorities"],["Modifier le plan", "Edit plan"],["Voir calendrier complet", "See full calendar"],["Ajuster le temps", "Adjust time"],["Détails", "Details"],["Masquer", "Hide"],["Lancer la séance", "Start session"],["À faire", "To do"],["Planifiée", "Planned"],["Facultative", "Optional"],["En cours", "In progress"],["Fait", "Done"],["Temps par jour :", "Time per day:"],["Touchez un jour pour voir ses séances.", "Tap a day to see its sessions."],["Cours commencés", "Courses started"],["Séance faite", "Session done"],["Fermer", "Close"],["Séances", "Sessions"],["Pages", "Pages"],["Plan de révision", "Revision plan"],["Haute priorité", "High priority"],["Moyenne priorité", "Medium priority"],["Basse priorité", "Low priority"]);
+  I18N.push(["ÉTAPE 1 : CONTEXTE", "STEP 1: CONTEXT"],["ÉTAPE 2 : CALENDRIER", "STEP 2: CALENDAR"],["ÉTAPE 3 : MATIÈRES", "STEP 3: SUBJECTS"],["ÉTAPE 4 : RYTHME", "STEP 4: PACE"],["ÉTAPE 5 : INTELLIGENCE", "STEP 5: INTELLIGENCE"],
+    ["Bienvenue ! Dis-moi, c'est pour quoi ?", "Welcome! Tell me, what's this for?"],["Quel est le grand jour, et combien de temps par jour ?", "When is the big day, and how long per day?"],["Qu'est-ce que tu révises ?", "What are you studying?"],["Quelle intensité veux-tu ?", "How intense do you want to be?"],["Presque fini ! Choisis les fonctions IA.", "Almost there! Choose AI features."],
+    ["Examen", "Exam"],["Contrôle continu", "Continuous assessment"],["Apprentissage libre", "Free learning"],["Heure de début", "Start time"],["Facultative en apprentissage libre (plan sur 4 semaines).", "Optional in free learning (4-week plan)."],
+    ["Matières (vos PDF importés)", "Subjects (your imported PDFs)"],["Tapez pour rechercher une matière.", "Type to search a subject."],["Activités", "Activities"],["Notes (résumé et pages à relire)", "Notes (summary and pages to reread)"],["Colle orale", "Oral exam"],
+    ["Intensité", "Intensity"],["Faible", "Low"],["Moyenne", "Medium"],["Élevée", "High"],["Jours de repos", "Rest days"],["Lun", "Mon"],["Mar", "Tue"],["Mer", "Wed"],["Jeu", "Thu"],["Ven", "Fri"],["Sam", "Sat"],["Dim", "Sun"],
+    ["Fonctions IA", "AI features"],["Répétition espacée", "Spaced repetition"],["Priorisation IA", "AI prioritization"],["Alertes de surcharge", "Overload alerts"],
+    ["Répétition espacée", "Spaced repetition"],[": chaque activité revient à intervalles croissants.", ": each activity comes back at growing intervals."],[": les matières et les pages les plus fragiles passent en premier.", ": the weakest subjects and pages come first."],[": AKORI signale les journées qui dépassent ton temps.", ": AKORI flags the days that go over your time."],
+    ["‹ Précédent", "‹ Previous"],["Annuler", "Cancel"],["Suivant", "Next"],["Générer le plan final", "Generate the final plan"],["Modifier le plan", "Edit the plan"],
+    ["⚠️ Choisis la date de ton examen.", "⚠️ Pick your exam date."],["⚠️ Choisis la date de ton contrôle.", "⚠️ Pick your test date."],["⚠️ Cette date est déjà passée : choisis une date à venir.", "⚠️ This date has passed: pick an upcoming date."],
+    ["⚠️ Choisis au moins une matière parmi tes PDF.", "⚠️ Pick at least one subject from your PDFs."],["⚠️ Importe d'abord un PDF dans « Mes dossiers ».", "⚠️ Import a PDF in “My folders” first."],["⚠️ Garde au moins une activité (notes, flashcards, quiz ou colle orale).", "⚠️ Keep at least one activity (notes, flashcards, quiz or oral exam)."],["⚠️ Garde au moins un jour de révision dans la semaine.", "⚠️ Keep at least one revision day in the week."],
+    ["Résumé", "Summary"],["Relecture", "Rereading"],["Revue finale", "Final review"],["Lancer la séance", "Start the session"],["Pourquoi cette séance ?", "Why this session?"],["Pages à relire", "Pages to reread"],["Quand", "When"],["Durée", "Duration"],["Statut", "Status"],
+    ["Jour de repos", "Rest day"],["Journée libre", "Free day"],["Repos", "Rest"],["Le jour J", "The big day"],["Contrôle", "Test"],["Fin du plan", "End of plan"],["du plan", "of the plan"],["terminé", "completed"],["Supprimer", "Delete"],
+    ["Laissez la mémoire consolider : aucune séance n'est prévue.", "Let your memory consolidate: no session is planned."],["Pas de nouvelle notion : relisez seulement votre résumé et vos flashcards « à revoir ».", "No new concepts: just reread your summary and your “to review” flashcards."],
+    ["⚠️ Journée chargée : elle dépasse votre temps par jour.", "⚠️ Busy day: it goes over your daily time."],["Votre examen", "Your exam"],["Votre contrôle", "Your test"],["Mes révisions", "My revision"],["Plan sur 4 semaines", "4-week plan"],
+    ["Aucune matière dans ce plan.", "No subject in this plan."],["La date du plan est dépassée.", "The plan date has passed."],
+    ["Lire le résumé du cours", "Read the course summary"],["Relire les pages faibles", "Reread the weak pages"],["Relire les pages faibles (rappel)", "Reread the weak pages (reminder)"],["Générer puis faire une série de flashcards", "Generate then do a set of flashcards"],["Entretenir tes flashcards", "Keep up your flashcards"],["Faire un quiz pour mesurer ta base", "Take a quiz to measure your base"],["Faire un quiz d'entretien", "Take a maintenance quiz"],["Passer une première colle orale", "Take a first oral exam"],["Passer une colle orale d'entretien", "Take a maintenance oral exam"],
+    ["Le résumé n'a pas encore été généré : c'est la base avant de s'entraîner.", "The summary hasn't been generated yet: it's the base before practicing."],["Première séance : elle mesure votre niveau de départ.", "First session: it measures your starting level."],["Résultats encore fragiles : la séance revient plus tôt.", "Results still fragile: the session comes back sooner."],["Répétition espacée : on revient sur ce cours avant de l'oublier.", "Spaced repetition: we come back to this course before you forget it."],["Dernière séance avant le jour J : on repasse uniquement sur l'essentiel.", "Last session before the big day: only the essentials."],
+    ["Un assistant en 5 étapes construit ton emploi du temps de révision.", "A 5-step assistant builds your revision timetable."],["Contexte et calendrier : examen, contrôle continu ou apprentissage libre, la date et le temps par jour.", "Context and calendar: exam, continuous assessment or free learning, the date and the time per day."],["Matières et rythme : choisissez vos PDF, l'intensité, les jours de repos et les fonctions IA.", "Subjects and pace: choose your PDFs, the intensity, the rest days and the AI features."],["L'emploi du temps s'affiche semaine par semaine : touchez une séance pour voir son détail et la lancer.", "The timetable shows week by week: tap a session to see its details and start it."]);
+  PATTERNS.push(...[["^Semaine (\\d+) · (.+) · (\\d+) min$", "Week $1 · $2 · $3 min"], ["^Plan sur (\\d+) semaines$", "$1-week plan"], ["^(\\d+) matière\\(s\\)$", "$1 subject(s)"], ["^(\\d+) séance\\(s\\)$", "$1 session(s)"],
+    ["^par jour · dès (.+)$", "per day · from $1"], ["^Rythme (.+) · repos : (.+)$", "Pace $1 · rest: $2"], ["^Répétition espacée : rappel n° (\\d+) pour ancrer la mémoire à long terme\\.$", "Spaced repetition: reminder no. $1 to anchor long-term memory."],
+    ["^Pages repérées grâce à vos erreurs(.*)$", "Pages spotted from your mistakes$1"], ["^Revue finale : (.+)$", "Final review: $1"]].map(([re, to]) => [new RegExp(re), to]));
   const EXACT = new Map(I18N.map(([fr, en]) => [fr.trim(), en]));
   const codeOf = (label) => /English/.test(String(label)) ? 'en' : 'fr';
   const labelOf = (code) => code === 'en' ? 'English' : 'Français';
@@ -7059,56 +7391,70 @@ AKORI_NAV_JS = r"""
     try { sessionStorage.setItem('akori-reloaded', String(Date.now())); } catch (e) {}
     window.setTimeout(() => location.reload(), 1500);
   }, 700);
-  // Plan de révision intelligent : cartes cliquables (détails, lancer, calendrier, temps, modifier)
+  // Plan de révision : emploi du temps intelligent (semaine à l'écran, détail d'une séance ou d'un jour au toucher)
+  const edtShow = (edt, w) => {
+    const weeks = [...edt.querySelectorAll('.edt-week')];
+    if (!weeks.length) return;
+    w = Math.max(0, Math.min(weeks.length - 1, w));
+    weeks.forEach((x, i) => x.classList.toggle('on', i === w));
+    edt.dataset.cur = String(w);
+    const lbl = edt.querySelector('.edt-wl'); if (lbl) lbl.textContent = weeks[w].dataset.label || '';
+    const p = edt.querySelector('.edt-prev'), n = edt.querySelector('.edt-next');
+    if (p) p.disabled = w === 0; if (n) n.disabled = w === weeks.length - 1;
+  };
+  const edtModal = (tpl) => {
+    const old = document.querySelector('body > .edt-modal'); if (old) old.remove();
+    const modal = document.createElement('div');
+    modal.className = 'edt-modal'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+    const box = document.createElement('div'); box.className = 'edt-mbox';
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'edt-mclose'; x.setAttribute('aria-label', 'Fermer'); x.textContent = '✕';
+    box.appendChild(x); box.appendChild(tpl.content.cloneNode(true)); modal.appendChild(box);
+    if (document.body.classList.contains('akori-dark')) modal.classList.add('dark');
+    document.body.appendChild(modal);
+    const close = () => { modal.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target.closest('.edt-mclose')) return close();
+      const go = e.target.closest('.pl-go');
+      if (go) { close(); planGo(go); }
+    });
+    x.focus();
+  };
+  const planGo = (go) => {
+    const m = go.className.match(/ak-t-(\w+)/);
+    const doc = go.dataset.doc || '';
+    const sel = document.querySelector('#doc-select input');
+    if (doc && !(sel && sel.value === doc)) sendHidden('plan-go-box', 'plan-go-btn', doc);
+    const nav = m && document.getElementById('nav-' + m[1]);
+    window.setTimeout(() => { if (nav) nav.click(); window.scrollTo({ top: 0, behavior: 'smooth' }); }, doc ? 260 : 0);
+  };
   document.addEventListener('click', (e) => {
     const t = e.target.closest ? e.target : null;
     if (!t) return;
-    const card = t.closest('.pl-card');
-    if (t.closest('.pl-cancel')) { document.body.classList.remove('plan-editing'); return; }
-    if (!card) return;
-    if (t.closest('.pl-showall')) { t.closest('.pl-grid').classList.add('all'); return; }
-    const det = t.closest('.pl-det');
-    if (det) { const task = det.closest('.pl-task'); task.classList.toggle('open'); det.textContent = task.classList.contains('open') ? 'Masquer' : 'Détails'; return; }
-    const go = t.closest('.pl-go');
-    if (go) {
-      const m = go.className.match(/ak-t-(\w+)/);
-      const doc = go.dataset.doc || '';
-      const sel = document.querySelector('#doc-select input');
-      if (doc && !(sel && sel.value === doc)) sendHidden('plan-go-box', 'plan-go-btn', doc);
-      const nav = m && document.getElementById('nav-' + m[1]);
-      window.setTimeout(() => { if (nav) nav.click(); window.scrollTo({ top: 0, behavior: 'smooth' }); }, doc ? 260 : 0);
+    if (t.closest('.edt-edit')) { const b = document.getElementById('plan-edit-btn'); if (b) b.click(); return; }
+    const edt = t.closest('.edt');
+    if (!edt) return;
+    if (t.closest('.edt-del')) {
+      const en = window.__akoriLang === 'en';
+      if (window.confirm(en ? 'Delete this revision plan?' : 'Supprimer ce plan de révision ?')) { const b = document.getElementById('plan-clear'); if (b) b.click(); }
       return;
     }
-    if (t.closest('.pl-edit')) {
-      document.body.classList.add('plan-editing');
-      const f = document.getElementById('plan-form-col'); if (f) window.setTimeout(() => f.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-      return;
-    }
-    if (t.closest('.pl-cal-t')) { card.classList.toggle('cal-open'); card.classList.remove('adj-open'); if (card.classList.contains('cal-open')) card.querySelector('.pl-cal').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
-    if (t.closest('.pl-adj-t')) { card.classList.toggle('adj-open'); card.classList.remove('cal-open'); return; }
-    const mins = t.closest('.pl-mins');
-    if (mins) { card.querySelectorAll('.pl-mins').forEach((b) => b.classList.toggle('on', b === mins)); sendHidden('plan-min-box', 'plan-min-btn', mins.dataset.m + ':' + Date.now()); return; }
-    const cd = t.closest('.pl-cd');
-    if (cd && !cd.classList.contains('pl-cd-x')) {
-      card.querySelectorAll('.pl-cd.sel').forEach((c) => c.classList.remove('sel')); cd.classList.add('sel');
-      const tpl = cd.querySelector('template'); const out = card.querySelector('.pl-cal-detail');
-      if (tpl && out) { out.innerHTML = ''; out.appendChild(tpl.content.cloneNode(true)); }
-    }
+    if (t.closest('.edt-prev')) return edtShow(edt, (+edt.dataset.cur || 0) - 1);
+    if (t.closest('.edt-next')) return edtShow(edt, (+edt.dataset.cur || 0) + 1);
+    const cell = t.closest('.edt-blk, .edt-dh, .edt-exam');
+    const tpl = cell && cell.querySelector(':scope > template');
+    if (tpl) edtModal(tpl);
   });
-  window.setInterval(() => {
-    document.body.classList.toggle('plan-ready', !!document.querySelector('#plan-view-col .pl-card'));
-    const sv = window.__akPlanSave;
-    if (sv) {
-      const st = document.getElementById('plan-status');
-      const msg = st ? (st.textContent || '').trim() : '';
-      const card = document.querySelector('#plan-view-col .pl-card');
-      if (card && (card !== sv.card || Date.now() - sv.t > 1500) && /^\s*(✅|Plan de révision mis à jour|Revision plan updated)/.test(msg)) { document.body.classList.remove('plan-editing'); window.__akPlanSave = null; }
-      else if (Date.now() - sv.t > 15000) window.__akPlanSave = null;
-    }
-  }, 300);
-  document.addEventListener('click', (e) => {
-    if (e.target.closest && e.target.closest('#plan-save')) window.__akPlanSave = { t: Date.now(), card: document.querySelector('#plan-view-col .pl-card') };
-  }, true);
+  // Glisser horizontalement sur l'emploi du temps : semaine précédente / suivante
+  let edtX = null, edtY = null;
+  document.addEventListener('pointerdown', (e) => { const w = e.target.closest && e.target.closest('.edt-weeks'); edtX = w ? e.clientX : null; edtY = e.clientY; });
+  document.addEventListener('pointerup', (e) => {
+    if (edtX === null) return;
+    const dx = e.clientX - edtX, dy = e.clientY - edtY; edtX = null;
+    const edt = e.target.closest && e.target.closest('.edt');
+    if (edt && Math.abs(dx) > 70 && Math.abs(dy) < 60) edtShow(edt, (+edt.dataset.cur || 0) + (dx < 0 ? 1 : -1));
+  });
   // Comptes récents sur l'écran de connexion (comme Messenger)
   const ACC_KEY = 'akori-accounts';
   const accLoad = () => { try { return JSON.parse(localStorage.getItem(ACC_KEY) || '[]'); } catch (e) { return []; } };
@@ -8271,23 +8617,47 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                                 prof_status = gr.Markdown("", elem_id="prof-status")
 
                     with gr.Tab("Plan de révision", id="plan") as tab_plan:
-                        with gr.Row(elem_classes="ak-cols", equal_height=False):
-                            with gr.Column(scale=2, min_width=280, elem_classes="ak-pane", elem_id="plan-form-col"):
-                                gr.HTML("<div class='pane-title'>Mon examen</div><button type='button' class='pl-cancel'>✕ Fermer</button>")
-                                plan_date = gr.Textbox(label="Date de l'examen", placeholder="AAAA-MM-JJ", elem_id="plan-date")
-                                plan_name = gr.Textbox(label="Intitulé (facultatif)", placeholder="Ex. : Partiel de réseaux", elem_id="plan-name")
-                                plan_scope = gr.Dropdown(label="Cours concernés", choices=_plan_scope_choices(), value="all", elem_id="plan-scope")
-                                plan_minutes = gr.Slider(10, 240, value=40, step=5, label="Minutes par jour", elem_id="plan-minutes")
-                                with gr.Row(elem_classes="ak-toolbar"):
-                                    plan_btn = gr.Button("Créer mon plan", variant="primary", elem_id="plan-save")
-                                    plan_del = gr.Button("Supprimer", elem_id="plan-clear")
-                                plan_status = gr.Markdown("", elem_id="plan-status")
-                            with gr.Column(scale=3, min_width=300, elem_classes="ak-pane", elem_id="plan-view-col"):
-                                plan_box = gr.HTML(plan_html())
-                                plan_min_box = gr.Textbox(elem_id="plan-min-box", elem_classes="akori-hidden", show_label=False, container=False)
-                                plan_min_btn = gr.Button("min", elem_id="plan-min-btn", elem_classes="akori-hidden")
-                                plan_go_box = gr.Textbox(elem_id="plan-go-box", elem_classes="akori-hidden", show_label=False, container=False)
-                                plan_go_btn = gr.Button("go", elem_id="plan-go-btn", elem_classes="akori-hidden")
+                        pw_step = gr.State(1)
+                        # Assistant en 5 étapes : contexte, calendrier, matières (PDF importés), rythme, fonctions IA
+                        with gr.Column(visible=True, elem_id="plan-wizard") as pw_col:
+                            pw_head = gr.HTML(_pw_head(1), elem_id="pw-head")
+                            with gr.Row(elem_id="pw-stage", equal_height=False):
+                                pw_mascot = gr.HTML(_pw_mascot("wave"), elem_id="pw-mascot", scale=0, min_width=120)
+                                with gr.Column(elem_id="pw-fields", scale=1, min_width=240):
+                                    with gr.Column(visible=True, elem_classes="pw-step") as pw_s1:
+                                        pw_context = gr.Radio(PW_CONTEXT_CHOICES, value="exam", show_label=False, container=False, elem_id="pw-context")
+                                        plan_name = gr.Textbox(label="Intitulé (facultatif)", placeholder="Ex. : Partiel de réseaux", elem_id="plan-name")
+                                    with gr.Column(visible=False, elem_classes="pw-step") as pw_s2:
+                                        plan_date = gr.Textbox(label="Date de l'examen", placeholder="AAAA-MM-JJ", elem_id="plan-date",
+                                                               info="Facultative en apprentissage libre (plan sur 4 semaines).")
+                                        with gr.Row(elem_classes="pw-row"):
+                                            plan_minutes = gr.Slider(10, 240, value=40, step=5, label="Minutes par jour", elem_id="plan-minutes", scale=3)
+                                            pw_start = gr.Dropdown(PW_START_CHOICES, value="18:00", label="Heure de début", elem_id="pw-start", scale=1, min_width=120)
+                                    with gr.Column(visible=False, elem_classes="pw-step") as pw_s3:
+                                        pw_docs = gr.Dropdown(choices=[], value=[], multiselect=True, label="Matières (vos PDF importés)",
+                                                              info="Tapez pour rechercher une matière.", elem_id="pw-docs")
+                                        pw_acts = gr.CheckboxGroup(PW_ACT_CHOICES, value=list(PLAN_ACTS), label="Activités", elem_id="pw-acts")
+                                    with gr.Column(visible=False, elem_classes="pw-step") as pw_s4:
+                                        pw_intensity = gr.Radio(PW_INTENSITY_CHOICES, value="mid", label="Intensité", elem_id="pw-intensity")
+                                        pw_rest = gr.CheckboxGroup(PW_REST_CHOICES, value=["6"], label="Jours de repos", elem_id="pw-rest")
+                                    with gr.Column(visible=False, elem_classes="pw-step") as pw_s5:
+                                        pw_ai = gr.CheckboxGroup(PW_AI_CHOICES, value=["spaced", "prio"], label="Fonctions IA", elem_id="pw-ai")
+                                        gr.HTML("<div class='pw-ai-help'><p><b>Répétition espacée</b> : chaque activité revient à intervalles croissants.</p>"
+                                                "<p><b>Priorisation IA</b> : les matières et les pages les plus fragiles passent en premier.</p>"
+                                                "<p><b>Alertes de surcharge</b> : AKORI signale les journées qui dépassent ton temps.</p></div>")
+                                    pw_err = gr.Markdown("", elem_id="plan-status")
+                            with gr.Row(elem_id="pw-nav"):
+                                pw_prev_btn = gr.Button("‹ Précédent", elem_id="pw-prev", visible=False, scale=0, min_width=130)
+                                pw_cancel_btn = gr.Button("Annuler", elem_id="pw-cancel", scale=0, min_width=120)
+                                pw_next_btn = gr.Button("Suivant", elem_id="pw-next", scale=0, min_width=120)
+                                pw_gen_btn = gr.Button("Générer le plan final", elem_id="pw-gen", visible=False, scale=0, min_width=220)
+                        # Emploi du temps intelligent (affiché une fois le plan généré)
+                        with gr.Column(visible=False, elem_id="plan-edt") as edt_col:
+                            plan_box = gr.HTML("")
+                        plan_go_box = gr.Textbox(elem_id="plan-go-box", elem_classes="akori-hidden", show_label=False, container=False)
+                        plan_go_btn = gr.Button("go", elem_id="plan-go-btn", elem_classes="akori-hidden")
+                        plan_edit_btn = gr.Button("edit", elem_id="plan-edit-btn", elem_classes="akori-hidden")
+                        plan_del = gr.Button("del", elem_id="plan-clear", elem_classes="akori-hidden")
 
                     with gr.Tab("Historique", id="history") as tab_history:
                         journal_box = gr.HTML(history_page_html())
@@ -8514,11 +8884,18 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
         after_session_refresh, None, [plan_box, journal_box], queue=False, show_progress="hidden")
     tab_mindmap.select(mindmap_view, [doc_selector, lang_choice], [mm_box, mm_status], queue=False, show_progress="hidden")
     doc_selector.change(mindmap_view, [doc_selector, lang_choice], [mm_box, mm_status], queue=False, show_progress="hidden")
-    tab_plan.select(plan_open, None, [plan_box, plan_date, plan_name, plan_scope, plan_minutes, plan_status], queue=False, show_progress="hidden")
+    PW_VIEW = [pw_step, pw_head, pw_mascot, pw_s1, pw_s2, pw_s3, pw_s4, pw_s5, pw_prev_btn, pw_next_btn, pw_gen_btn, pw_err]
+    PW_FIELDS = [pw_context, plan_name, plan_date, plan_minutes, pw_start, pw_docs, pw_acts, pw_intensity, pw_rest, pw_ai]
+    PLAN_OPEN_OUT = [pw_col, edt_col, plan_box] + PW_VIEW + PW_FIELDS
+    tab_plan.select(plan_open, None, PLAN_OPEN_OUT, queue=False, show_progress="hidden")
+    plan_edit_btn.click(plan_edit, None, PLAN_OPEN_OUT, queue=False, show_progress="hidden")
+    plan_del.click(plan_clear, None, PLAN_OPEN_OUT, queue=False, show_progress="hidden")
     tab_history.select(history_page_html, None, [journal_box], queue=False, show_progress="hidden")
-    plan_btn.click(plan_save, [plan_date, plan_name, plan_scope, plan_minutes], [plan_box, plan_status], queue=False)
-    plan_del.click(plan_clear, None, [plan_box, plan_status, plan_date, plan_name, plan_scope], queue=False)
-    plan_min_btn.click(plan_set_minutes, [plan_min_box], [plan_box, plan_minutes], queue=False, show_progress="hidden")
+    nav_plan.click(plan_open, None, PLAN_OPEN_OUT, queue=False, show_progress="hidden")
+    pw_next_btn.click(pw_next, [pw_step, pw_context, plan_date, pw_docs, pw_acts, pw_rest], PW_VIEW, queue=False, show_progress="hidden")
+    pw_prev_btn.click(pw_prev, [pw_step], PW_VIEW, queue=False, show_progress="hidden")
+    pw_cancel_btn.click(pw_cancel, None, [pw_col, edt_col] + PW_VIEW, queue=False, show_progress="hidden")
+    pw_gen_btn.click(pw_generate, PW_FIELDS, [pw_col, edt_col, plan_box] + PW_VIEW, queue=False, show_progress="hidden")
     plan_go_btn.click(lambda d: gr.update(value=d) if d in documents_db else gr.update(), [plan_go_box], [doc_selector],
                       queue=False, show_progress="hidden")
     mod_create.click(module_create, [mod_name, mod_sem, doc_selector], [mod_pick, mod_status, modules_box, mod_name], queue=False)
