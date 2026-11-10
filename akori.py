@@ -1177,7 +1177,7 @@ def global_progress_html(active_doc=None):
   oral_avg = f"{st['oral_avg']:.1f}/10" if st['oral_avg'] is not None else "—"
   # Une seule vue par cours : le carrousel (ouvert en cliquant sur la carte) ; ici, uniquement les chiffres globaux.
   gp_mood = "wave" if not st["started"] else ("celebrate" if pct >= 80 else ("happy" if pct >= 50 else ("encourage" if pct >= 20 else "sad")))
-  return _progress_carousel_html() + f"""<div class='global-progress-hero gp-open' role='button' tabindex='0' title='Voir le détail par cours'><div class='gp-ms'>{mascot_svg(gp_mood)}</div><div class='global-progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div><div class='global-progress-copy'><h2>Progression globale</h2><p>Moyenne de vos {st['courses']} cours. Chaque cours compte 3 activités : flashcards, quiz et colle orale.</p><span class='gp-hint'>Voir le détail par cours →</span></div></div><div class='global-metrics'><div><b>{st['started']}/{st['courses']}</b><span>Cours commencés</span></div><div><b>{st['known']}/{st['flashcards']}</b><span>Flashcards maîtrisées</span></div><div><b>{quiz_avg}</b><span>Moyenne des quiz</span><small>{st['quizzes']} quiz terminé(s)</small></div><div><b>{oral_avg}</b><span>Moyenne des colles</span><small>{st['orals']} colle(s)</small></div></div>"""
+  return _progress_carousel_html() + f"""<div class='progress-hero gp-hero gp-open' role='button' tabindex='0' title='Voir le détail par cours'><div class='progress-ring' style='--progress:{pct}%;'><span class='cu'>{pct}%</span></div><div class='gp-copy'><div class='progress-title'>Progression globale</div><div class='progress-sub'>Moyenne de vos {st['courses']} cours · 3 activités par cours : flashcards, quiz et colle orale.</div><span class='gp-hint'>Voir le détail par cours →</span></div><div class='gp-ms'>{mascot_svg(gp_mood)}</div></div><div class='global-metrics'><div><b>{st['started']}/{st['courses']}</b><span>Cours commencés</span></div><div><b>{st['known']}/{st['flashcards']}</b><span>Flashcards maîtrisées</span></div><div><b>{quiz_avg}</b><span>Moyenne des quiz</span><small>{st['quizzes']} quiz terminé(s)</small></div><div><b>{oral_avg}</b><span>Moyenne des colles</span><small>{st['orals']} colle(s)</small></div></div>"""
 
 
 GP_COLORS = ["#4f6df5", "#8e6cf4"]   # palette de l'application (bleu → violet), comme les autres barres
@@ -1951,19 +1951,41 @@ def _source_html(src):
           f"<div class='ak-src-quote'>{quote}</div></li>")
 
 
+def _fmt_dur(ms):
+  """Durée lisible : « moins d'une seconde », « 4 s », « 1 min 12 s », « 1 h 5 min »."""
+  sec = float(ms or 0) / 1000
+  if sec < 1:
+    return "moins d'une seconde"
+  if sec < 60:
+    return f"{sec:.0f} s"
+  if sec < 3600:
+    return f"{int(sec // 60)} min {int(sec % 60)} s"
+  return f"{int(sec // 3600)} h {int(sec % 3600 // 60)} min"
+
+
+def _time_html(item):
+  """Heure d'un message : relative (« il y a 5 min », « il y a 2 h ») quand la date complète est connue."""
+  label = _escape_html(item.get("t") or "")
+  if not label and not item.get("ts"):
+    return ""
+  # le filtre HTML du chat retire les attributs data-* : l'horodatage passe par une classe (ts-AAAAMMJJTHHMMSS)
+  stamp = re.sub(r"[^0-9T]", "", str(item.get("ts") or ""))[:15]
+  ts = f" ts-{stamp}" if len(stamp) == 15 else ""
+  timing = item.get("timing") or {}
+  tip = f" title='Réponse en {_escape_html(_fmt_dur(timing['total']))}'" if timing.get("total") else ""
+  return f"<span class='msg-time{ts}'{tip}>{label}</span>"
+
+
 def _message_actions_html(index, item):
-  """Barre d'actions sous une réponse : épingler en chapitre, lire à voix haute, voir les sources."""
+  """Barre d'actions sous une réponse : icônes (épingler, écouter, sources), nom au survol, puis l'heure."""
   sources = item.get("sources") or []
   buttons = [
-      f"<button type='button' class='ak-act ak-a-pin ak-i-{index}'>📌 <span>Épingler comme chapitre</span></button>",
-      "<button type='button' class='ak-act ak-a-speak'>🔊 <span>Lire à voix haute</span></button>",
+      f"<button type='button' class='ak-act ak-a-pin ak-i-{index}' aria-label='Épingler comme chapitre'>📌 <span>Épingler comme chapitre</span></button>",
+      "<button type='button' class='ak-act ak-a-speak' aria-label='Lire à voix haute'>🔊 <span>Lire à voix haute</span></button>",
   ]
   if sources:
-    buttons.append(f"<button type='button' class='ak-act ak-a-sources'>📎 <span>Sources ({len(sources)})</span></button>")
-  timing = item.get("timing") or {}
-  if timing.get("total"):
-    buttons.append(f"<span class='ak-timing' title='Temps de réponse'>⏱ {_fmt_ms(timing['total'])}</span>")
-  html_out = "<div class='ak-msg-actions'>" + "".join(buttons) + "</div>"
+    buttons.append(f"<button type='button' class='ak-act ak-a-sources' aria-label='Sources'>📎 <span>Sources ({len(sources)})</span></button>")
+  html_out = "<div class='ak-msg-actions'>" + "".join(buttons) + _time_html(item) + "</div>"
   if sources:
     html_out += "<ol class='ak-src-list' hidden>" + "".join(_source_html(x) for x in sources) + "</ol>"
   return "\n\n" + html_out
@@ -1981,8 +2003,8 @@ def _chat_history_for_ui(doc_name):
       streaming = bool(item.get("streaming")) and index == len(raw) - 1
       if item["role"] == "assistant" and not streaming and not content.startswith(("⏳", "⚠️", "ℹ️")):
         content += _message_actions_html(index, item)
-      if item.get("t") and not streaming:
-        content += f"\n\n<span class='msg-time'>{_escape_html(item['t'])}</span>"
+      elif not streaming and (item.get("t") or item.get("ts")):
+        content += "\n\n" + _time_html(item)
       result.append({"role": item["role"], "content": content})
   return result
 
@@ -2153,9 +2175,10 @@ def _ui_chat_user_message(message_utilisateur, history, doc_selectionne):
     return "", history, ""
 
   historique = documents_db[doc_selectionne]["history"]
-  now = datetime.now().strftime("%H:%M")
-  historique.append({"role": "user", "content": message_str, "t": now})
-  historique.append({"role": "assistant", "content": "⏳ Génération…", "t": now})
+  stamp = datetime.now()
+  now, ts = stamp.strftime("%H:%M"), stamp.isoformat(timespec="seconds")
+  historique.append({"role": "user", "content": message_str, "t": now, "ts": ts})
+  historique.append({"role": "assistant", "content": "⏳ Génération…", "t": now, "ts": ts})
   if len(historique) > HISTORY_KEEP:
     del historique[:-HISTORY_KEEP]
 
@@ -3723,7 +3746,7 @@ def mindmap_html(data):
         y += 14
     H = y + 4
     ry = sum(by_list) / len(by_list)
-    out = [f"<svg class='mm-svg' viewBox='0 0 {W} {H}' style='min-width:{min(W, 760)}px' xmlns='http://www.w3.org/2000/svg'>"]
+    out = [f"<svg class='mm-svg' viewBox='0 0 {W} {H}' xmlns='http://www.w3.org/2000/svg'>"]
     out.append(f"<defs><linearGradient id='mmroot' x1='0' x2='1'><stop offset='0' stop-color='#4f6df5'/><stop offset='1' stop-color='#8e6cf4'/></linearGradient></defs>")
     for i, b in enumerate(branches):
         c = MM_COLORS[i % len(MM_COLORS)]
@@ -3748,7 +3771,11 @@ def mindmap_html(data):
         g.append("</g></g>")
         out.append("".join(g))
     out.append("</svg>")
-    return "<div class='mm-wrap'><div class='mm-hint'>Cliquez sur une branche pour la replier ou la déplier.</div><div class='mm-scroll'>" + "".join(out) + "</div></div>"
+    zoom = ("<div class='mm-zoom'><button type='button' class='mm-z' data-z='out' aria-label='Dézoomer'>−</button>"
+            "<span class='mm-zl'>100 %</span><button type='button' class='mm-z' data-z='in' aria-label='Zoomer'>+</button>"
+            "<button type='button' class='mm-z mm-fit' data-z='fit'>Ajuster</button></div>")
+    return ("<div class='mm-wrap'><div class='mm-bar'><div class='mm-hint'>Cliquez sur une branche pour la replier ou la déplier. "
+            "Zoomez avec + et −, puis faites glisser la carte.</div>" + zoom + "</div><div class='mm-scroll' style='--mmz:1'>" + "".join(out) + "</div></div>")
 
 
 def mindmap_view(doc_name=None, lang=None):
@@ -3980,51 +4007,68 @@ ORAL_MIC_JS = r"""
   const area = document.querySelector('#oral-answer textarea');
   const btn = document.getElementById('oral-mic');
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const en = window.__akoriLang === 'en';
   if (!area || !btn) return;
-  if (!SR) { if (window.__akBanner) window.__akBanner(window.__akoriLang === 'en' ? 'Voice dictation is not supported by this browser (use Chrome).' : "La dictée vocale n'est pas disponible sur ce navigateur (utilisez Chrome)."); return; }
-  if (window.__akRec) { window.__akRecStop = true; window.__akRec.stop(); return; }
+  if (!SR) { if (window.__akBanner) window.__akBanner(en ? 'Voice dictation is not supported by this browser (use Chrome).' : "La dictée vocale n'est pas disponible sur ce navigateur (utilisez Chrome)."); return; }
+  if (window.__akRec) { window.__akRecStop = true; try { window.__akRec.stop(); } catch (e) {} return; }
+  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
   const setValue = (v) => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(area, v);
     area.dispatchEvent(new Event('input', { bubbles: true }));
+    area.scrollTop = area.scrollHeight;
   };
-  // Sur téléphone (Chrome Android), le mode continu renvoie des résultats cumulés et répétés
-  // (« Cali sur Cali sur le… ») : on dicte phrase par phrase et on relance la reconnaissance.
-  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  // Fusion des segments reconnus. Chrome sur ordinateur renvoie des segments distincts ; Chrome Android renvoie
+  // souvent chaque segment final en répétant les précédents (texte cumulé) : on remplace au lieu d'ajouter.
+  const merge = (a, b) => {
+    a = clean(a); b = clean(b);
+    if (!a) return b; if (!b) return a;
+    const la = a.toLowerCase(), lb = b.toLowerCase();
+    if (lb.startsWith(la)) return b;
+    if (la.endsWith(lb)) return a;
+    return a + ' ' + b;
+  };
+  // Indicateur « écoute en cours » sous la zone de réponse, avec le texte en train d'être reconnu
+  const box = area.closest('.block') || area.parentElement;
+  let live = document.getElementById(btn.id + '-live');
+  if (!live) { live = document.createElement('div'); live.id = btn.id + '-live'; live.className = 'mic-live'; box.insertAdjacentElement('afterend', live); }
+  const showLive = (txt) => {
+    live.innerHTML = '';
+    const dot = document.createElement('b'); dot.textContent = en ? 'Listening… tap the microphone again to stop' : 'Écoute en cours… touchez à nouveau le micro pour arrêter';
+    live.appendChild(dot);
+    if (txt) { const t = document.createElement('span'); t.textContent = txt; live.appendChild(t); }
+    live.classList.add('on');
+  };
   let base = clean(area.value);
   let empty = 0;
   window.__akRecStop = false;
-  const finish = () => { window.__akRec = null; btn.classList.remove('rec-on'); };
+  const finish = () => { window.__akRec = null; btn.classList.remove('rec-on'); live.classList.remove('on'); setValue(base); };
   const start = () => {
     const rec = new SR();
-    rec.lang = window.__akoriLang === 'en' ? 'en-US' : 'fr-FR';
-    rec.continuous = !mobile;
+    rec.lang = en ? 'en-US' : 'fr-FR';
+    rec.continuous = true;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
-    let heard = '';
+    let session = '';
     rec.onresult = (e) => {
-      let fin = '', interim = '';
-      if (mobile) {
-        const last = e.results[e.results.length - 1];      // la dernière hypothèse contient déjà toute la phrase
-        if (last.isFinal) fin = clean(last[0].transcript); else interim = clean(last[0].transcript);
-      } else {
-        for (let i = 0; i < e.results.length; i++) {
-          const t = clean(e.results[i][0].transcript);
-          if (e.results[i].isFinal) fin += (fin ? ' ' : '') + t; else interim += (interim ? ' ' : '') + t;
-        }
-      }
-      heard = fin || interim || heard;
-      setValue(clean(base + ' ' + (fin + ' ' + interim)));
+      let fin = '', interim = '', lastFinal = -1;
+      for (let i = 0; i < e.results.length; i++) if (e.results[i].isFinal) { fin = merge(fin, e.results[i][0].transcript); lastFinal = i; }
+      // texte provisoire : seulement ce qui suit le dernier segment final (le reste est déjà compris dedans)
+      for (let i = lastFinal + 1; i < e.results.length; i++) interim = merge(interim, e.results[i][0].transcript);
+      session = merge(fin, interim);
+      setValue(clean(base + ' ' + session));
+      showLive(interim || fin.split(' ').slice(-12).join(' '));
     };
-    rec.onerror = (e) => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') window.__akRecStop = true; };
+    rec.onerror = (e) => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture') window.__akRecStop = true; };
     rec.onend = () => {
-      if (heard) { base = clean(base + ' ' + heard); empty = 0; } else { empty += 1; }
+      if (session) { base = clean(base + ' ' + session); empty = 0; } else { empty += 1; }
       setValue(base);
-      if (mobile && !window.__akRecStop && empty < 2) { try { start(); return; } catch (err) {} }
+      // Chrome coupe la reconnaissance après un silence : on la relance tant que l'étudiant n'a pas arrêté
+      if (!window.__akRecStop && empty < 4) { try { start(); return; } catch (err) {} }
       finish();
     };
     window.__akRec = rec;
     btn.classList.add('rec-on');
+    showLive('');
     rec.start();
   };
   start();
@@ -6863,7 +6907,17 @@ html:root:root:root:root body.no-docsel #topbar > .form:has(#doc-select), html:r
 .ms-result .ms-box { flex:none;width:6.5rem; }
 .ms-result b { display:block;font-size:1.15rem;color:var(--ak-text); } .ms-result span { display:block;color:var(--ak-muted);font-size:.9rem;line-height:1.45;margin-top:.2rem; }
 .oral-ms { flex:none;width:5rem; }
-.gp-ms { flex:none;width:clamp(4.5rem, 9vw, 6.5rem);order:3;margin-left:auto; }
+.gp-ms { flex:none;width:clamp(3.6rem, 7vw, 5rem); }
+/* vue d'ensemble : même carte que la vue détaillée (anneau, titre, sous-titre), le texte garde toute la place */
+html:root:root:root:root body .progress-hero.gp-hero { display:grid!important;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:1rem!important; }
+html:root:root:root:root body .progress-hero .progress-ring { flex:none;width:4.6rem;height:4.6rem; }
+html:root:root:root:root body .gp-copy, html:root:root:root:root body .progress-hero > div { min-width:0;overflow-wrap:normal!important;word-break:normal!important; }
+html:root:root:root:root body .gp-copy .progress-title { font-size:1.05rem;line-height:1.3; }
+html:root:root:root:root body .gp-copy .progress-sub { line-height:1.45; }
+html:root:root:root:root body .gp-copy .gp-hint { margin-top:.35rem;font-size:.78rem; }
+html:root:root:root:root body.m-mode .progress-hero.gp-hero { gap:.7rem!important;padding:1rem!important; }
+html:root:root:root:root body.m-mode .progress-hero.gp-hero .gp-ms { width:3rem; } html:root:root:root:root body.m-mode .progress-hero .progress-ring { width:4rem;height:4rem; }
+html:root:root:root:root body .global-metrics > div { overflow-wrap:normal!important;word-break:normal!important; }
 html:root:root:root:root body .hero-compact .hero-visual .hero-mascot { width:auto;height:clamp(7rem, 17vh, 9.5rem);max-width:none; }
 html:root:root:root:root body .hero-compact .hero-visual { justify-content:center!important; }
 .pw-mascot.mascot { width:100%; }
@@ -6919,6 +6973,50 @@ html:root:root:root:root body #chat-scope label { border-radius:99px!important; 
 .chat-empty img { width:4.5rem;height:4.5rem;border-radius:1.1rem;box-shadow:0 10px 30px rgba(79,109,245,.3);animation:akpulse 4.5s ease-in-out infinite; }
 .chat-empty b { font-size:1.4rem;color:var(--ak-text); } .chat-empty span { color:var(--ak-muted);line-height:1.5; }
 html:root:root:root:root body #assistant-chatbot .placeholder-content, html:root:root:root:root body #assistant-chatbot .placeholder { height:100%;display:flex;align-items:center;justify-content:center; }
+/* ===== Assistant : actions en icônes alignées sous la réponse, nom affiché au survol, heure à droite ===== */
+html:root:root:root:root body #assistant-chatbot .ak-msg-actions { display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:.15rem!important;margin-top:.35rem!important;opacity:1!important; }
+html:root:root:root:root body #assistant-chatbot .ak-act { position:relative;width:2.1rem!important;height:2.1rem!important;min-height:0!important;padding:0!important;justify-content:center!important;
+  border-radius:.6rem!important;color:var(--ak-muted)!important;-webkit-text-fill-color:var(--ak-muted)!important; }
+html:root:root:root:root body #assistant-chatbot .ak-act .ak-ico { margin:0!important;width:1.05rem!important;height:1.05rem!important; }
+html:root:root:root:root body #assistant-chatbot .ak-act > span:not(.ak-ico) { position:absolute;left:50%;bottom:calc(100% + .4rem);transform:translate(-50%, .25rem);opacity:0;pointer-events:none;
+  white-space:nowrap;font-size:.72rem;font-weight:600;padding:.3rem .55rem;border-radius:.45rem;background:#111827;color:#fff!important;-webkit-text-fill-color:#fff!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);transition:opacity .15s ease, transform .15s ease;z-index:5; }
+html:root:root:root:root body #assistant-chatbot .ak-act:hover > span:not(.ak-ico), html:root:root:root:root body #assistant-chatbot .ak-act:focus-visible > span:not(.ak-ico) { opacity:1;transform:translate(-50%, 0); }
+html:root:root:root:root body #assistant-chatbot .ak-act:hover, html:root:root:root:root body #assistant-chatbot .ak-act.on { color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important; }
+html:root:root:root:root body #assistant-chatbot .ak-act.on { color:#4f6df5!important;-webkit-text-fill-color:#4f6df5!important; }
+html:root:root:root:root body #assistant-chatbot .ak-msg-actions .msg-time { margin-left:auto;padding-left:.6rem;font-size:.72rem;opacity:.6;white-space:nowrap;cursor:default; }
+html:root:root:root:root body #assistant-chatbot .ak-timing { display:none!important; }
+@media (hover: none) { html:root:root:root:root body #assistant-chatbot .ak-act > span:not(.ak-ico) { display:none; } }
+
+/* ===== Mindmap : barre de zoom, carte ajustée à l'écran, déplacement en glissant ===== */
+.mm-bar { display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.5rem; }
+html:root:root:root:root body .mm-bar .mm-hint { margin:0!important;flex:1 1 16rem; }
+.mm-zoom { display:inline-flex;align-items:center;gap:.2rem;border:1px solid var(--ak-line);border-radius:99px;padding:.2rem;background:var(--ak-bg); }
+html:root:root:root:root body .gradio-container button.mm-z.mm-z { width:2.1rem;height:2.1rem;min-height:0;padding:0;border-radius:50%!important;border:0!important;background:transparent!important;
+  color:var(--ak-text)!important;-webkit-text-fill-color:var(--ak-text)!important;font-size:1.15rem;font-weight:700;line-height:1;cursor:pointer;box-shadow:none!important; }
+html:root:root:root:root body .gradio-container button.mm-z.mm-fit { width:auto;padding:0 .8rem;border-radius:99px!important;font-size:.78rem; }
+html:root:root:root:root body .gradio-container button.mm-z.mm-z:hover { background:var(--ak-soft)!important; }
+.mm-zl { min-width:3.2rem;text-align:center;font-size:.75rem;font-weight:700;color:var(--ak-muted);font-variant-numeric:tabular-nums; }
+html:root:root:root:root body .mm-scroll { overflow:auto!important;touch-action:none;cursor:grab;border-radius:.8rem; }
+html:root:root:root:root body .mm-scroll.drag { cursor:grabbing; } html:root:root:root:root body .mm-scroll.drag * { user-select:none; }
+html:root:root:root:root body .mm-scroll .mm-svg { width:calc(100% * var(--mmz, 1))!important;max-width:none!important;min-width:0!important;height:auto!important; }
+html:root:root:root:root body.m-mode .mm-wrap { padding:.7rem!important; } html:root:root:root:root body.m-mode .mm-bar .mm-hint { font-size:.74rem; }
+
+/* ===== Dictée : indicateur « écoute en cours » et texte reconnu ===== */
+.mic-live { display:none;margin:.35rem 0 .1rem;padding:.5rem .75rem;border-radius:.7rem;background:rgba(229,72,77,.1);border:1px solid rgba(229,72,77,.35);font-size:.82rem; }
+.mic-live.on { display:flex;flex-direction:column;gap:.15rem; }
+.mic-live b { color:#e5484d;display:flex;align-items:center;gap:.45rem; }
+.mic-live b::before { content:"";width:.55rem;height:.55rem;border-radius:50%;background:#e5484d;animation:akpulse 1.1s ease-in-out infinite; }
+.mic-live span { color:var(--ak-text);font-style:italic; }
+html:root:root:root:root body #assistant-bar { position:relative; }
+html:root:root:root:root body #assistant-bar .mic-live { position:absolute;left:1rem;right:1rem;bottom:calc(100% + .4rem);z-index:4;background:var(--ak-card); }
+html:root:root:root:root body #oral-answer textarea { font-size:1rem!important;line-height:1.55!important; }
+
+/* ===== Colle orale : résultat lisible sur téléphone ===== */
+html:root:root:root:root body .oral-top { flex-wrap:wrap!important; }
+html:root:root:root:root body .oral-top > div:last-child { flex:1 1 14rem;min-width:0;overflow-wrap:normal!important;word-break:normal!important; }
+html:root:root:root:root body.m-mode .oral-top > div:last-child, html:root:root:root:root body.ak-narrow .oral-top > div:last-child { flex-basis:100%; }
+html:root:root:root:root body .oral-result, html:root:root:root:root body .oral-result * { overflow-wrap:break-word!important;word-break:normal!important; }
 """
 
 
@@ -6974,6 +7072,9 @@ I18N_SRC = r"""
     ["Aucun module pour le moment.", "No module yet."],["Importez vos PDF puis regroupez-les par module (matière) et par semestre.", "Import your PDFs, then group them by module (subject) and semester."],
     ["Aucun document pour le moment.", "No document yet."],["Ajoutez votre premier PDF pour commencer.", "Add your first PDF to get started."],["Aucun chapitre épinglé pour ce cours.", "No pinned chapter for this course."],
     ["La correction s'affichera ici.", "The correction will appear here."],["Note sur 10, points manquants et page à relire.", "Mark out of 10, missing points and page to reread."]);
+  I18N.push(["Zoomez avec + et −, puis faites glisser la carte.", "Zoom with + and −, then drag the map."],["Ajuster", "Fit"],["Progression globale", "Global progress"],["Voir le détail par cours →", "See details by course →"]);
+  PATTERNS.push(...[["^Moyenne de vos (\\d+) cours · 3 activités par cours : flashcards, quiz et colle orale\\.$", "Average of your $1 courses · 3 activities per course: flashcards, quiz and oral exam."],
+    ["^Réponse en (.+)$", "Answered in $1"]].map(([re, to]) => [new RegExp(re), to]));
   const EXACT = new Map(I18N.map(([fr, en]) => [fr.trim(), en]));
   const codeOf = (label) => /English/.test(String(label)) ? 'en' : 'fr';
   const labelOf = (code) => code === 'en' ? 'English' : 'Français';
@@ -7791,6 +7892,85 @@ AKORI_NAV_JS = r"""
     document.body.classList.toggle('in-app', !!document.getElementById('sidebar'));
     if (mq.matches) document.body.classList.remove('sidebar-collapsed');
   }, 400);
+  // Mindmap : zoom (+, −, ajuster, Ctrl + molette, pincement à deux doigts) et déplacement en faisant glisser
+  const mmSet = (sc, z, cx, cy) => {
+    const old = +sc.dataset.z || 1;
+    z = Math.max(1, Math.min(5, z));
+    const rx = (sc.scrollLeft + (cx ?? sc.clientWidth / 2)) / (sc.scrollWidth || 1);
+    const ry = (sc.scrollTop + (cy ?? sc.clientHeight / 2)) / (sc.scrollHeight || 1);
+    sc.style.setProperty('--mmz', z); sc.dataset.z = z;
+    sc.scrollLeft = rx * sc.scrollWidth - (cx ?? sc.clientWidth / 2);
+    sc.scrollTop = ry * sc.scrollHeight - (cy ?? sc.clientHeight / 2);
+    const lbl = sc.closest('.mm-wrap').querySelector('.mm-zl'); if (lbl) lbl.textContent = Math.round(z * 100) + ' %';
+    sc.classList.toggle('zoomed', z > 1.01);
+    return old;
+  };
+  document.addEventListener('click', (e) => {
+    const zb = e.target.closest && e.target.closest('.mm-z');
+    if (!zb) return;
+    const sc = zb.closest('.mm-wrap').querySelector('.mm-scroll');
+    const z = +sc.dataset.z || 1;
+    mmSet(sc, zb.dataset.z === 'in' ? z * 1.3 : (zb.dataset.z === 'out' ? z / 1.3 : 1));
+  });
+  document.addEventListener('wheel', (e) => {
+    const sc = e.target.closest && e.target.closest('.mm-scroll');
+    if (!sc || !(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    const r = sc.getBoundingClientRect();
+    mmSet(sc, (+sc.dataset.z || 1) * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  let mmDrag = null; const mmTouches = new Map();
+  document.addEventListener('pointerdown', (e) => {
+    const sc = e.target.closest && e.target.closest('.mm-scroll');
+    if (!sc) return;
+    window.__mmDragged = false;
+    mmTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (mmTouches.size === 2) {
+      const [a, b] = [...mmTouches.values()];
+      mmDrag = { sc, pinch: Math.hypot(a.x - b.x, a.y - b.y), z: +sc.dataset.z || 1 };
+    } else {
+      mmDrag = { sc, x: e.clientX, y: e.clientY, l: sc.scrollLeft, t: sc.scrollTop };
+    }
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!mmDrag) return;
+    if (mmTouches.has(e.pointerId)) mmTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const sc = mmDrag.sc;
+    if (mmDrag.pinch && mmTouches.size === 2) {
+      const [a, b] = [...mmTouches.values()];
+      const r = sc.getBoundingClientRect();
+      mmSet(sc, mmDrag.z * Math.hypot(a.x - b.x, a.y - b.y) / mmDrag.pinch, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+      window.__mmDragged = true; return;
+    }
+    if (mmDrag.pinch) return;
+    const dx = e.clientX - mmDrag.x, dy = e.clientY - mmDrag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 5) { window.__mmDragged = true; sc.classList.add('drag'); }
+    sc.scrollLeft = mmDrag.l - dx; sc.scrollTop = mmDrag.t - dy;
+  });
+  const mmEnd = (e) => {
+    mmTouches.delete(e.pointerId);
+    if (mmDrag && mmTouches.size === 0) { mmDrag.sc.classList.remove('drag'); mmDrag = null; window.setTimeout(() => { window.__mmDragged = false; }, 0); }
+  };
+  document.addEventListener('pointerup', mmEnd); document.addEventListener('pointercancel', mmEnd);
+  // Chat : heure relative des messages (« à l'instant », « il y a 5 min », « il y a 2 h », « hier à 21:40 »)
+  const relTime = (iso) => {
+    const d = new Date(iso); if (isNaN(d)) return null;
+    const en = window.__akoriLang === 'en';
+    const s = (Date.now() - d.getTime()) / 1000;
+    const hm = d.toLocaleTimeString(en ? 'en-GB' : 'fr-FR', { hour: '2-digit', minute: '2-digit' });
+    if (s < 60) return en ? 'just now' : "à l'instant";
+    if (s < 3600) { const m = Math.floor(s / 60); return en ? `${m} min ago` : `il y a ${m} min`; }
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    if (s < 6 * 3600 || d.toDateString() === new Date().toDateString()) { const h = Math.floor(s / 3600); return en ? `${h} h ago` : `il y a ${h} h`; }
+    if (d.toDateString() === y.toDateString()) return en ? `yesterday at ${hm}` : `hier à ${hm}`;
+    return d.toLocaleDateString(en ? 'en-GB' : 'fr-FR', { day: '2-digit', month: '2-digit' }) + (en ? ' at ' : ' à ') + hm;
+  };
+  const tickTimes = () => document.querySelectorAll('.msg-time[class*="ts-"]').forEach((el) => {
+    const m = el.className.match(/ts-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/);
+    if (!m) return;
+    const t = relTime(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`); if (t && el.textContent !== t) el.textContent = t;
+  });
+  window.setInterval(tickTimes, 2000);
   // Page de présentation : apparition au défilement, ancres, bouton « Se connecter »
   const lrIO = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); lrIO.unobserve(e.target); } }), { threshold: .12 }) : null;
   const scanLr = () => document.querySelectorAll('.lr:not(.in):not([data-lr])').forEach((el) => { el.dataset.lr = '1'; if (lrIO) lrIO.observe(el); else el.classList.add('in'); });
@@ -7802,7 +7982,7 @@ AKORI_NAV_JS = r"""
     const anchor = event.target.closest && event.target.closest('.ld-links a, .ld a[href^="#ld-"]');
     if (anchor) { event.preventDefault(); const t = document.getElementById(anchor.getAttribute('href').slice(1)); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     const br = event.target.closest && event.target.closest('.mm-bnode');
-    if (br) br.closest('.mm-br').classList.toggle('mm-closed');
+    if (br && !window.__mmDragged) br.closest('.mm-br').classList.toggle('mm-closed');
     const opt = event.target.closest && event.target.closest('button.opt-click');
     if (opt) { const m = opt.className.match(/ak-o-(\d+)/); if (m) { opt.classList.add('selected'); sendHidden('quiz-pick-box', 'quiz-pick-btn', m[1]); } return; }
     if (event.target.closest && event.target.closest('.ak-quiz-next')) quizNext();
@@ -8782,7 +8962,7 @@ with gr.Blocks(title="AKORI — AI Study Assistant") as demo:
                         with gr.Row(elem_classes="ak-cols", equal_height=False):
                             with gr.Column(scale=1, min_width=300, elem_classes="ak-pane"):
                                 oral_card = gr.HTML(oral_card_html(None))
-                                oral_answer = gr.Textbox(lines=4, max_lines=8, label="Votre réponse", placeholder="Écrivez ou dictez votre réponse…", elem_id="oral-answer")
+                                oral_answer = gr.Textbox(lines=5, max_lines=16, label="Votre réponse", placeholder="Écrivez ou dictez votre réponse…", elem_id="oral-answer")
                                 with gr.Row(elem_classes="ak-toolbar"):
                                     oral_new = gr.Button("Nouvelle question", elem_id="oral-new")
                                     oral_mic = gr.Button("🎤 Dicter", elem_id="oral-mic")
