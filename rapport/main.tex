@@ -19,6 +19,8 @@
 \usepackage{xcolor}
 \usepackage{amsmath}
 \usepackage[most]{tcolorbox}
+\usepackage{makecell}
+\usepackage{qrcode}
 \usepackage{hyperref}  % toujours en dernier
 
 \hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,citecolor=black}
@@ -28,8 +30,21 @@
 \setlength{\tabcolsep}{4pt}
 \setlength{\emergencystretch}{2em}
 
-% Valeurs encore à compléter : affichées en rouge pour ne pas les oublier.
+% Valeurs encore à compléter (page de titre) : affichées en rouge pour ne pas les oublier.
 \newcommand{\aremplir}[1]{\textcolor{red}{[#1]}}
+
+% Résultats mesurés : fichiers produits par rapport/benchmark_akori.py (ne pas modifier à la main).
+% « n. m. » = non mesuré ; relancer le banc puis recompiler met à jour tous les chiffres du rapport.
+\newcommand{\nonmesure}{n.\,m.}
+\input{resultats_benchmark.tex}
+\newcommand{\siGemini}[2]{\ifnum\GemN>0 #1\else #2\fi}
+
+% Références de la webographie : [W1], [W2]…
+\newcommand{\webref}[1]{[\ref{web:#1}]}
+\newcommand{\depot}{https://github.com/mon-espace-claude/AKORI}
+
+% DOI cliquables dans la bibliographie
+\newcommand{\doi}[1]{\href{https://doi.org/\detokenize{#1}}{doi:\,\detokenize{#1}}}
 
 \begin{document}
 
@@ -299,7 +314,7 @@ Le premier objectif consiste à concevoir un pipeline capable d'exploiter des su
 Le deuxième objectif est de mettre en place FAISS pour l'indexation et la recherche des représentations vectorielles. Lorsqu'un étudiant pose une question, celle-ci est transformée dans le même espace vectoriel que les segments du document, et le système récupère les passages dont les vecteurs sont les plus proches. FAISS ne génère pas la réponse de l'assistant : son rôle se limite à la recherche des passages pertinents dans l'espace vectoriel.
 
 \textbf{Objectif 3 : contrôler la pertinence du contexte et réduire le risque d'hallucination.}
-Le troisième objectif consiste à empêcher la génération lorsque les informations disponibles dans le document ne sont pas suffisamment pertinentes. Les vecteurs étant normalisés, la distance L2 renvoyée par FAISS se convertit directement en similarité cosinus. Si le meilleur passage a une similarité inférieure à 0,30 (valeur par défaut, réglable), le système n'appelle pas Gemini et répond que l'information ne figure pas dans le document. Ce seuil a été réglé sur \aremplir{n} questions portant sur le cours et \aremplir{n} questions hors sujet. Cette approche réduit le risque de réponses non fondées, mais ne garantit pas l'absence totale d'erreurs.
+Le troisième objectif consiste à empêcher la génération lorsque les informations disponibles dans le document ne sont pas suffisamment pertinentes. Les vecteurs étant normalisés, la distance L2 renvoyée par FAISS se convertit directement en similarité cosinus. Si le meilleur passage a une similarité inférieure à 0,30 (valeur par défaut, réglable), le système n'appelle pas Gemini et répond que l'information ne figure pas dans le document. Ce seuil a été évalué sur \SeuilCoursN{} questions portant sur le cours, \SeuilRefoN{} questions reformulées, \SeuilAbsN{} questions proches du sujet dont la réponse est absente du cours et \SeuilHorsN{} questions hors sujet (chapitre~\ref{chap:resultats} et annexe~\ref{annexe:tests}). Il joue le rôle de filet de sécurité : il écarte les questions les plus éloignées du cours, tandis que la consigne donnée au modèle (répondre uniquement à partir des passages fournis) traite les questions voisines. Cette approche réduit le risque de réponses non fondées, mais ne garantit pas l'absence totale d'erreurs.
 
 \textbf{Objectif 4 : réduire la latence globale du pipeline.}
 L'utilisation d'un modèle de langage local entraînait un temps d'inférence important sur le matériel disponible. Une partie du travail a donc porté sur la mesure du temps de chaque étape (recherche, premier mot affiché, réponse complète), puis sur le déplacement de la génération vers l'API Gemini (modèle principal \texttt{gemini-3.5-flash-lite}, avec une chaîne de modèles de secours). L'application enregistre ces temps pour chaque question afin de les évaluer sur l'usage réel.
@@ -401,7 +416,7 @@ La conduite du projet s'est appuyée sur une démarche itérative, combinant ana
 Python s'est imposé comme le standard dans les domaines de l'IA, du NLP et de la science des données, porté par une communauté active et des bibliothèques optimisées. Dans AKORI, son utilisation assure une continuité sur l'ensemble de la chaîne, de l'ingestion à la restitution :
 \begin{itemize}[nosep]
   \item \textbf{ingestion} : PyMuPDF pour l'extraction du texte, avec OCR des pages scannées ;
-  \item \textbf{recherche} : FAISS (cœur C++ et liaisons Python) pour la recherche vectorielle dense, via LangChain \cite{langchaindoc} ;
+  \item \textbf{recherche} : FAISS (cœur C++ et liaisons Python) pour la recherche vectorielle dense, via LangChain \webref{langchain} ;
   \item \textbf{données} : NumPy et structures natives pour les embeddings, les métadonnées et les fichiers JSON ;
   \item \textbf{interface} : Gradio \cite{abid2019gradio} pour une interface web réactive.
 \end{itemize}
@@ -436,7 +451,7 @@ Le LLM ne produit plus de savoirs de sa propre initiative ; il agit comme un for
 
 L'une des caractéristiques d'AKORI est la répartition des traitements entre l'application et un service distant.
 
-\textbf{Traitements effectués par l'application.} L'extraction du texte, l'OCR par Tesseract (lorsqu'il est installé), le découpage, la vectorisation par BGE-M3, l'indexation et la recherche FAISS s'exécutent dans l'environnement où tourne AKORI (session Google Colab ou serveur). Les documents n'ont pas besoin d'être envoyés à un service tiers pour être indexés, et la recherche vectorielle ne prend que quelques millisecondes.
+\textbf{Traitements effectués par l'application.} L'extraction du texte, l'OCR par Tesseract (lorsqu'il est installé), le découpage, la vectorisation par BGE-M3, l'indexation et la recherche FAISS s'exécutent dans l'environnement où tourne AKORI (session Google Colab ou serveur). Les documents n'ont pas besoin d'être envoyés à un service tiers pour être indexés, et la recherche d'une question, encodage par BGE-M3 compris, prend environ \RechMed~ms sur un processeur sans GPU (chapitre~\ref{chap:resultats}).
 
 \textbf{Traitements délégués à l'API Gemini.} La formulation des réponses et la génération des contenus de révision sont confiées à Gemini. Pour une question, seuls la question et les $k$ passages retenus sont transmis. Pour le résumé, les flashcards, le quiz et la mindmap, un échantillon plus large du document (douze passages répartis sur l'ensemble du cours) est envoyé. Lorsque Tesseract n'est pas disponible, les pages scannées sont transmises sous forme d'image à Gemini pour en lire le texte.
 
@@ -473,7 +488,7 @@ Restitution & Application & Gradio & Affichage des réponses et des sources, act
 
 Après des tests comparatifs avec un modèle open source exécuté localement (Qwen 2.5 7B \cite{qwen2024report}), le choix s'est arrêté sur l'API Google Gemini \cite{gemini2023}, pour trois raisons :
 \begin{itemize}[nosep]
-  \item \textbf{latence} : une réponse complète en \aremplir{x} s en médiane, contre 10 à 20 secondes observées lors de l'inférence locale sur GPU partagé ;
+  \item \textbf{latence} : \siGemini{une réponse complète en \GemTotal~s en médiane}{un seul appel au lieu de trois, ce qui supprime les 7 à 12 secondes d'étapes intermédiaires du prototype (reformulation et filtrage)}, contre 10 à 20 secondes observées lors de l'inférence locale sur GPU partagé ;
   \item \textbf{respect des consignes} : meilleure adhérence aux formats de sortie structurés (JSON) imposés par l'application ;
   \item \textbf{stabilité} : plus de risque de saturation de la mémoire du GPU.
 \end{itemize}
@@ -760,7 +775,7 @@ Deux approches ont été étudiées pour l'étape de génération : un modèle e
 Infrastructure requise & GPU dédié (8 à 16 Go de VRAM) & Aucune côté application \\ \hline
 Temps jusqu'au premier jeton & 1 à 3 s par appel & Quelques centaines de millisecondes \\ \hline
 Débit de génération & 5 à 15 jetons/s (matériel du projet) & Nettement supérieur (variable selon la charge) \\ \hline
-Latence totale observée & 10 à 20 s (prototype à trois appels) & \aremplir{x} s en médiane (un appel) \\ \hline
+Latence totale observée & 10 à 20 s (prototype à trois appels) & \siGemini{\GemTotal~s en médiane (un appel)}{Un seul appel ; voir le tableau~\ref{tab:latences}} \\ \hline
 Fenêtre de contexte & Limitée par la VRAM (8k à 32k jetons) & Très large (de l'ordre du million de jetons) \\ \hline
 Coût & Achat ou location d'un GPU & À l'usage (niveau gratuit disponible) \\ \hline
 Confidentialité & Traitement entièrement sur la machine & Soumise aux conditions de l'API \\ \hline
@@ -833,7 +848,7 @@ Le schéma ci-dessous détaille l'articulation entre la couche d'ingestion docum
 
 \subsection{Modèle d'embedding (BGE-M3)}
 
-Développé par le BAAI, BGE-M3 (\emph{Multi-Linguality, Multi-Functionality, Multi-Granularity}) repose sur une architecture dérivée de XLM-RoBERTa et un entraînement par auto-distillation des connaissances \cite{chen2024bgem3}. Il prend en charge plus de 100 langues, combine recherche dense, éparse et multi-vectorielle, et accepte des séquences jusqu'à 8192 jetons.
+Développé par le BAAI, BGE-M3 (\emph{Multi-Linguality, Multi-Functionality, Multi-Granularity}) repose sur une architecture dérivée de XLM-RoBERTa et un entraînement par auto-distillation des connaissances \cite{chen2024bgem3}. Il prend en charge plus de 100 langues, combine recherche dense, éparse et multi-vectorielle, et accepte des séquences jusqu'à 8192 jetons. AKORI utilise le modèle publié sur Hugging Face \webref{bgem3}, chargé par la bibliothèque Sentence-Transformers \webref{sbert}.
 
 AKORI en exploite la branche dense : chaque fragment est projeté dans un espace de 1024 dimensions, avec des vecteurs normalisés. Ce choix améliore la discrimination des passages sur des cours en français et réduit les faux positifs lors de la recherche. Sans GPU, l'indexation d'un long document reste plus lente qu'avec un modèle léger ; l'indexation peut être préparée à l'avance (mode \texttt{--build}).
 
@@ -851,17 +866,17 @@ La recherche exacte (index plat) suffit pour quelques milliers de fragments et r
 
 \subsection{Moteur génératif (Gemini)}
 
-L'API Gemini \cite{genaisdk} intervient à l'extrémité du pipeline. Elle reçoit un prompt contenant les passages numérotés et la question, et transforme ces extraits en explication pédagogique, sans dépasser le cadre des informations fournies. Le modèle principal est \texttt{gemini-3.5-flash-lite}, appelé via le SDK officiel \texttt{google-genai}, avec une chaîne de modèles de secours et les mécanismes de résilience décrits au chapitre~2. Les fonctions de révision utilisent des sorties JSON, vérifiées par l'application avant affichage.
+L'API Gemini \webref{genaisdk} intervient à l'extrémité du pipeline. Elle reçoit un prompt contenant les passages numérotés et la question, et transforme ces extraits en explication pédagogique, sans dépasser le cadre des informations fournies. Le modèle principal est \texttt{gemini-3.5-flash-lite}, appelé via le SDK officiel \texttt{google-genai}, avec une chaîne de modèles de secours et les mécanismes de résilience décrits au chapitre~2. Les fonctions de révision utilisent des sorties JSON, vérifiées par l'application avant affichage.
 
 \section{Briques techniques}
 
 \subsection{Interface utilisateur (Gradio)}
 
-Gradio constitue la couche de présentation. Écrit en Python, il relie directement les composants graphiques aux fonctions de traitement, sans couche d'API REST distincte \cite{abid2019gradio,gradiodoc}. Il prend en charge l'affichage progressif des réponses (\emph{streaming}). L'interface a été personnalisée par des feuilles de style et des scripts : navigation latérale, icônes vectorielles, thème clair ou sombre, traduction française et anglaise, page de présentation avant la connexion et mise en page dédiée au téléphone.
+Gradio constitue la couche de présentation. Écrit en Python, il relie directement les composants graphiques aux fonctions de traitement, sans couche d'API REST distincte \cite{abid2019gradio}\webref{gradio}. Il prend en charge l'affichage progressif des réponses (\emph{streaming}). L'interface a été personnalisée par des feuilles de style et des scripts : navigation latérale, icônes vectorielles, thème clair ou sombre, traduction française et anglaise, page de présentation avant la connexion et mise en page dédiée au téléphone.
 
 \subsection{Extraction du texte (PyMuPDF et OCR)}
 
-L'ingestion repose sur PyMuPDF \cite{pymupdfdoc}, plus rapide que pypdf ou pdfplumber. Le texte est extrait page par page. Lorsqu'une page contient moins de 20 caractères mais une image, elle est considérée comme scannée et transmise à l'OCR : Tesseract \cite{smith2007tesseract} en français et en anglais s'il est installé, sinon Gemini Vision. Au-delà de 80 pages scannées, les pages suivantes sont ignorées pour borner le temps de traitement.
+L'ingestion repose sur PyMuPDF \webref{pymupdf}, plus rapide que pypdf ou pdfplumber. Le texte est extrait page par page. Lorsqu'une page contient moins de 20 caractères mais une image, elle est considérée comme scannée et transmise à l'OCR : Tesseract \cite{smith2007tesseract} en français et en anglais s'il est installé, sinon Gemini Vision. Au-delà de 80 pages scannées, les pages suivantes sont ignorées pour borner le temps de traitement.
 
 \subsection{Découpage structuré}
 
@@ -958,7 +973,7 @@ Le plan de révision est construit par un assistant en cinq étapes : contexte (
   \item \textbf{Résumé} : points clés principaux du cours, dans la langue choisie, conservés avec le document.
   \item \textbf{Flashcards} : au moins sept cartes question-réponse en mode « roulette » ; l'étudiant indique « Je savais » ou « À revoir », ce qui alimente sa progression et son plan.
   \item \textbf{Quiz (QCM)} : cinq questions avec explication ; toucher une réponse affiche immédiatement la correction, et un glissement vers la gauche fait passer à la question suivante. Les erreurs sont rattachées à une notion pour la carte des lacunes.
-  \item \textbf{Colle orale} : AKORI choisit un passage du cours et pose une question ouverte ; l'étudiant répond à l'écrit ou à la voix (dictée). La réponse est notée sur 10 d'après le cours, avec les points manquants et la page à relire.
+  \item \textbf{Colle orale} : AKORI choisit un passage du cours et pose une question ouverte ; l'étudiant répond à l'écrit ou à la voix (dictée par la reconnaissance vocale du navigateur \webref{webspeech}). La réponse est notée sur 10 d'après le cours, avec les points manquants et la page à relire.
   \item \textbf{Mindmap} : carte mentale du cours (thème central, grandes notions, sous-notions) générée à partir des pages, affichée en SVG avec des branches repliables ; une carte simplifiée est construite à partir des sections si l'IA est indisponible.
   \item \textbf{À revoir} : réponses épinglées depuis l'assistant, rangées par cours.
   \item \textbf{Modules et semestres} : regroupement de plusieurs cours d'une même matière, importation de plusieurs fichiers à la fois, interrogation simultanée de plusieurs unités d'enseignement.
@@ -975,7 +990,7 @@ Le parcours d'un utilisateur dans l'application est présenté à la figure~\ref
 \begin{itemize}
   \item \textbf{Comptes} : inscription par adresse e-mail, connexion mémorisée par jeton, accueil en quatre étapes (prénom, niveau, objectif, langue), profil avec photo.
   \item \textbf{Adresses e-mail utilisables} : contrôle du format, détection des fautes de frappe courantes sur les domaines, refus des adresses jetables et vérification de l'existence du domaine.
-  \item \textbf{Mots de passe} : dérivation PBKDF2-SHA256 avec sel aléatoire et 200\,000 itérations ; seuls le sel et l'empreinte sont stockés.
+  \item \textbf{Mots de passe} : dérivation PBKDF2-SHA256 \webref{hashlib} avec sel aléatoire et 200\,000 itérations ; seuls le sel et l'empreinte sont stockés.
   \item \textbf{Isolation} : chaque utilisateur dispose de son propre dossier (cours, index, historique, plan, journal) ; chaque action s'exécute dans le contexte du compte connecté.
   \item \textbf{Administration} : liste des comptes, activation, changement de rôle, mot de passe temporaire, test de la connexion à Gemini, médianes des temps de réponse, sauvegarde et maintenance des données. En déploiement public, aucun mot de passe administrateur par défaut n'est utilisé.
 \end{itemize}
@@ -989,10 +1004,10 @@ Le parcours d'un utilisateur dans l'application est présenté à la figure~\ref
 
 \section{Déploiement et accès multiplateforme}
 
-AKORI peut être exécuté de deux manières :
+Le code source, la documentation d'installation et le banc de test sont publiés dans le dépôt GitHub du projet \webref{depot} (annexe~\ref{annexe:depot}). AKORI peut être exécuté de deux manières :
 \begin{itemize}
-  \item \textbf{Google Colab} : un lien public temporaire est créé et les données sont enregistrées sur le Google Drive de l'utilisateur ;
-  \item \textbf{Serveur} : un fichier Docker permet de déployer l'application, par exemple sur Hugging Face Spaces \cite{hfspaces}. Elle obtient une adresse web permanente, utilise un disque persistant (\texttt{/data}) et lit la clé d'API et le mot de passe administrateur dans des variables d'environnement secrètes.
+  \item \textbf{Google Colab} \webref{colab} : un lien public temporaire est créé et les données sont enregistrées sur le Google Drive de l'utilisateur ;
+  \item \textbf{Serveur} : un fichier Docker permet de déployer l'application, par exemple sur Hugging Face Spaces \webref{hfspaces}. Elle obtient une adresse web permanente, utilise un disque persistant (\texttt{/data}) et lit la clé d'API et le mot de passe administrateur dans des variables d'environnement secrètes.
 \end{itemize}
 
 L'interface s'adapte à la taille de l'écran : sur téléphone, le menu devient un tiroir ouvert par un bouton, les pages occupent toute la largeur et les commandes sont dimensionnées pour le toucher. L'application peut être ajoutée à l'écran d'accueil du téléphone, ce qui permet aux étudiants qui ne disposent pas d'ordinateur de l'utiliser.
@@ -1000,11 +1015,13 @@ L'interface s'adapte à la taille de l'écran : sur téléphone, le menu devient
 % =========================================================================
 % CHAPITRE 5
 % =========================================================================
-\chapter{Résultats, évaluation et discussion}
+\chapter{Résultats, évaluation et discussion}\label{chap:resultats}
 
 \section{Évaluation des performances}
 
-L'objectif était d'offrir une révision interactive sans compromettre la rigueur pédagogique. Pour chaque question, l'application relève le temps de recherche, le temps jusqu'au premier mot affiché et le temps de réponse complète ; la console d'administration en présente les médianes et le 95\textsuperscript{e} centile. Le tableau~\ref{tab:latences} compare le prototype local et la version finale.
+L'objectif était d'offrir une révision interactive sans compromettre la rigueur pédagogique. Pour chaque question, l'application relève le temps de recherche, le temps jusqu'au premier mot affiché et le temps de réponse complète ; la console d'administration en présente les médianes et le 95\textsuperscript{e} centile.
+
+\textbf{Protocole.} Les mesures de la version finale ont été produites par le banc de test \texttt{rapport/benchmark\_akori.py}, qui appelle les fonctions réelles d'AKORI (extraction, découpage 800/80, BGE-M3, FAISS, $k=4$, seuil 0,30, pipeline de réponse). Le cours de test est ce rapport lui-même au format PDF (\IdxPages{} pages), interrogé avec \RechN{} questions réparties en quatre séries : \SeuilCoursN{} questions dont la réponse figure dans le cours, \SeuilRefoN{} questions reformulées avec d'autres mots, \SeuilAbsN{} questions proches du sujet mais dont la réponse est absente du cours, et \SeuilHorsN{} questions hors sujet. Les mesures ont été faites le \BenchDate{} dans un conteneur Linux à \BenchCPU{} processeurs virtuels, \BenchMateriel. La liste des questions et le résultat de chacune figurent en annexe~\ref{annexe:tests}. Le tableau~\ref{tab:latences} compare le prototype local et la version finale.
 
 \begin{longtable}{p{0.27\textwidth}|p{0.25\textwidth}|p{0.25\textwidth}|p{0.14\textwidth}}
 \caption{Latences par étape : prototype local et version finale}\label{tab:latences}\\
@@ -1015,22 +1032,36 @@ L'objectif était d'offrir une révision interactive sans compromettre la rigueu
 \textbf{Étape} & \textbf{Prototype local (Qwen, 3 appels)} & \textbf{Version finale (Gemini, 1 appel)} & \textbf{Effet} \\ \hline
 \endhead
 Reformulation et mots-clés & 3 à 5 s & Supprimée & -- \\ \hline
-Recherche FAISS & environ 50 ms & \aremplir{x} ms (médiane) & Identique \\ \hline
+Recherche (encodage de la question + FAISS) & environ 50 ms (FAISS seul, GPU) & \RechMed~ms (médiane), \RechPq~ms (95\textsuperscript{e} centile), sur processeur & Du même ordre \\ \hline
 Filtrage factuel & 4 à 7 s & Remplacé par le seuil (moins de 1 ms) & -- \\ \hline
-Premier mot affiché & 3 à 6 s & \aremplir{x} ms (médiane) & \aremplir{x} \\ \hline
+Premier mot affiché & 3 à 6 s & \siGemini{\GemPremier~ms (médiane)}{\nonmesure} & \siGemini{Premier mot plus rapide}{--} \\ \hline
 Débit de génération & 5 à 15 jetons/s & Affichage fluide en flux & -- \\ \hline
-Réponse complète & 10 à 20 s & \aremplir{x} s (médiane), \aremplir{x} s (95\textsuperscript{e} centile) & \aremplir{réduction en \%} \\ \hline
+Réponse complète & 10 à 20 s & \siGemini{\GemTotal~s (médiane), \GemTotalPq~s (95\textsuperscript{e} centile)}{\nonmesure} & \siGemini{$-$\GemReduction~\% (base 15 s)}{--} \\ \hline
 \end{longtable}
 
-Mesures réalisées sur \aremplir{n} questions, du \aremplir{date} au \aremplir{date}, avec \aremplir{environnement : Colab CPU/GPU ou serveur}.
+\siGemini{Les temps de réponse de Gemini portent sur \GemN{} questions (même cours de test, mêmes séries de questions).}{\textbf{Cellules notées \nonmesure{} (non mesuré).} Elles dépendent de l'API Gemini, dont l'accès n'était pas autorisé dans l'environnement du banc de test. Les valeurs du prototype restent celles relevées sur Colab. Pour compléter ces cellules, il suffit de relancer \texttt{python rapport/benchmark\_akori.py rapport.pdf -{}-seulement gemini} avec une clé valide, puis de recompiler le rapport (annexe~\ref{annexe:tests}) : les chiffres se mettent à jour automatiquement.}
 
 \textbf{Résolution du goulot d'étranglement matériel.} L'exécution locale saturait la mémoire et le processeur lors des appels successifs. Le passage à l'API et à un appel unique déporte le calcul intensif et supprime les étapes intermédiaires.
 
 \textbf{Temps jusqu'au premier mot.} L'affichage progressif de la réponse donne un retour visuel rapide et évite l'impression de blocage.
 
-\textbf{Indépendance de la recherche vectorielle.} La recherche dans FAISS reste très rapide dans les deux configurations, ce qui confirme l'intérêt d'un index en mémoire pour ce type d'usage.
+\textbf{Indépendance de la recherche vectorielle.} La recherche reste rapide même sans GPU : \RechMed~ms en médiane pour encoder la question avec BGE-M3 et interroger l'index FAISS, ce qui confirme l'intérêt d'un index en mémoire pour ce type d'usage. L'essentiel de ce temps revient à l'encodage de la question ; la recherche FAISS elle-même porte sur quelques centaines de vecteurs seulement.
 
-\textbf{Indexation.} \aremplir{temps d'indexation d'un PDF de n pages, sur CPU et sur GPU, avec et sans OCR}.
+\textbf{Indexation.} Sur processeur seul, l'indexation du cours de test (\IdxPages{} pages, \IdxFragments{} fragments) prend \IdxDuree~s, soit environ \IdxParPage~s par page ; le chargement préalable du modèle BGE-M3, déjà téléchargé, prend \BenchChargement~s. Pour mesurer le coût de l'OCR, les \OcrPages{} premières pages ont été converties en images sans couche de texte, comme un document scanné : leur indexation passe de \OcrSans~s (texte natif) à \OcrAvec~s avec Tesseract, soit un surcoût d'environ \OcrSurcout~s par page. Ces mesures n'ont pas été refaites sur GPU. L'encodage par BGE-M3, qui représente l'essentiel du temps d'indexation, est la partie qu'un GPU accélère ; c'est pourquoi l'application conseille d'activer un GPU sur Colab, ou d'indexer les cours une fois à l'avance (\texttt{python akori.py -{}-build}).
+
+\begin{table}[H]
+\centering
+\caption{Temps d'indexation mesurés (processeur seul, \BenchCPU{} cœurs virtuels)}\label{tab:indexation}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Document & Pages & Mode d'extraction & Durée \\
+\midrule
+Cours de test complet & \IdxPages & Texte natif (PyMuPDF) & \IdxDuree~s \\
+\OcrPages{} premières pages & \OcrPages & Texte natif (PyMuPDF) & \OcrSans~s \\
+Mêmes pages, scannées & \OcrPages & OCR Tesseract & \OcrAvec~s \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[H]
   \centering
@@ -1041,29 +1072,48 @@ Mesures réalisées sur \aremplir{n} questions, du \aremplir{date} au \aremplir{
 
 \section{Évaluation qualitative et traitement des hallucinations}
 
-Pour mesurer la fiabilité pédagogique d'AKORI, le système a été soumis à plusieurs scénarios (tableau~\ref{tab:qualitatif}).
+Pour mesurer la fiabilité pédagogique d'AKORI, les quatre séries de questions décrites plus haut ont été soumises au système. La fiabilité est évaluée à deux niveaux : la recherche (le bon passage figure-t-il parmi les quatre transmis au modèle, et le seuil laisse-t-il passer la question ?), puis la réponse rédigée par Gemini. Un passage est jugé pertinent lorsqu'il contient l'élément de réponse attendu (par exemple « 800 » pour la taille des fragments) ; ce critère automatique est strict, car il ne reconnaît pas une réponse formulée autrement.
 
-\textbf{Scénario A : question présente dans le cours} (« Définir la mémoire cache L1 »). La réponse s'appuie sur les passages retrouvés ; sous chaque réponse, l'étudiant peut afficher les extraits utilisés avec leur page et leur section.
+\textbf{Scénario A : question présente dans le cours} (« Quelle est la taille des fragments lors du découpage du texte ? »). Le meilleur passage atteint une similarité de 0,70 et contient la réponse ; sous chaque réponse, l'étudiant peut afficher les extraits utilisés avec leur page et leur section. Sur les \SeuilCoursN{} questions de cette série, le passage attendu figure parmi les quatre premiers dans \SeuilCoursRappel{} cas.
 
-\textbf{Scénario B : question absente du document} (« Expliquer le protocole BGP » dans un cours d'architecture des ordinateurs). La similarité du meilleur passage reste sous le seuil de 0,30 : Gemini n'est pas appelé et AKORI répond que l'information ne figure pas dans le document.
+\textbf{Scénario B : question reformulée} (« Avec quel modèle les textes sont-ils transformés en listes de nombres ? »). BGE-M3 rapproche la question du passage consacré aux embeddings sans mot commun avec lui. La série reformulée obtient des similarités un peu plus faibles (médiane \SeuilRefoMed{} contre \SeuilCoursMed{}) et retrouve le passage attendu dans \SeuilRefoRappel{} cas sur \SeuilRefoN{}.
 
-\textbf{Scénario C : génération d'outils de révision.} Les flashcards, le quiz et la mindmap sont produits à partir d'un échantillon de passages du cours et d'une consigne interdisant les notions extérieures ; leur format JSON est vérifié avant affichage.
+\textbf{Scénario C : question hors sujet} (« Qui a peint le tableau de la Joconde ? »). La similarité du meilleur passage (0,28) est inférieure au seuil de 0,30 : Gemini n'est pas appelé et AKORI répond que l'information ne figure pas dans le document. Seules \SeuilHorsRefus{} questions hors sujet sur \SeuilHorsN{} sont toutefois arrêtées à ce stade : les questions de culture scientifique ou technique (« Comment fonctionne la blockchain du Bitcoin ? », 0,46) partagent assez de vocabulaire avec un cours d'informatique pour franchir le seuil. Elles sont alors transmises à Gemini avec la consigne de répondre uniquement à partir des passages fournis et d'indiquer sinon que l'information ne figure pas dans le cours.
 
-\textbf{Scénario D : question portant sur plusieurs cours d'un même module.} Avec la portée « Mon module », les passages sont recherchés dans tous les cours du module et les sources indiquent le document d'origine.
+\textbf{Scénario D : question proche du sujet dont la réponse est absente} (« Quelle est la taille maximale d'un PDF importé ? »). Le cours parle longuement des PDF importés, mais ne donne pas cette valeur. Les passages retrouvés sont donc très proches de la question (similarité \SeuilAbsMin{} à \SeuilAbsMax{} pour les \SeuilAbsN{} questions de la série), au même niveau que les vraies questions du cours : aucun seuil ne peut les distinguer, et seule la consigne du prompt peut conduire au refus.
 
-\begin{longtable}{p{0.3\textwidth}|p{0.15\textwidth}|p{0.22\textwidth}|p{0.22\textwidth}}
+\begin{longtable}{p{0.24\textwidth}|p{0.08\textwidth}|p{0.34\textwidth}|p{0.24\textwidth}}
 \caption{Résultats de l'évaluation qualitative}\label{tab:qualitatif}\\
 \hline
-\textbf{Catégorie de questions} & \textbf{Nombre} & \textbf{Comportement attendu} & \textbf{Résultat} \\ \hline
+\textbf{Série de questions} & \textbf{Nb} & \textbf{Critère} & \textbf{Résultat} \\ \hline
 \endfirsthead
 \hline
-\textbf{Catégorie de questions} & \textbf{Nombre} & \textbf{Comportement attendu} & \textbf{Résultat} \\ \hline
+\textbf{Série de questions} & \textbf{Nb} & \textbf{Critère} & \textbf{Résultat} \\ \hline
 \endhead
-Présentes dans le cours & \aremplir{n} & Réponse correcte et sourcée & \aremplir{\% correctes} \\ \hline
-Hors du cours & \aremplir{n} & Refus de répondre & \aremplir{\% refus corrects} \\ \hline
-Reformulées (synonymes) & \aremplir{n} & Passage pertinent retrouvé & \aremplir{\% dans les k passages} \\ \hline
-Portant sur plusieurs cours & \aremplir{n} & Sources de plusieurs documents & \aremplir{résultat} \\ \hline
+\multicolumn{4}{l}{\textit{Recherche (BGE-M3 + FAISS + seuil 0,30), mesurée}} \\ \hline
+Présentes dans le cours & \SeuilCoursN & Passage contenant la réponse parmi les 4 transmis & \SeuilCoursRappel/\SeuilCoursN{} (\SeuilCoursRappelPct~\%) \\ \hline
+Reformulées (synonymes) & \SeuilRefoN & Passage contenant la réponse parmi les 4 transmis & \SeuilRefoRappel/\SeuilRefoN{} (\SeuilRefoRappelPct~\%) \\ \hline
+Cours et reformulées & \the\numexpr\SeuilCoursN+\SeuilRefoN\relax & Question acceptée par le seuil & \the\numexpr\SeuilCoursAcceptes+\SeuilRefoAcceptes\relax/\the\numexpr\SeuilCoursN+\SeuilRefoN\relax{} (aucun refus à tort) \\ \hline
+Réponse absente du cours & \SeuilAbsN & Refus par le seuil, sans appel au modèle & \SeuilAbsRefus/\SeuilAbsN \\ \hline
+Hors sujet & \SeuilHorsN & Refus par le seuil, sans appel au modèle & \SeuilHorsRefus/\SeuilHorsN \\ \hline
+\multicolumn{4}{l}{\textit{Réponse rédigée par Gemini}} \\ \hline
+Présentes dans le cours & \SeuilCoursN & Réponse juste (élément attendu présent) & \siGemini{\GemCoursCorrectes/\SeuilCoursN{} (\GemCoursCorrectesPct~\%)}{\nonmesure} \\ \hline
+Présentes dans le cours & \SeuilCoursN & Réponse citant ses sources & \siGemini{\GemCoursCitees/\SeuilCoursN{} (\GemCoursCiteesPct~\%)}{\nonmesure} \\ \hline
+Réponse absente du cours & \SeuilAbsN & Refus final (seuil ou consigne) & \siGemini{\GemAbsRefus/\SeuilAbsN{} (\GemAbsRefusPct~\%)}{\nonmesure} \\ \hline
+Hors sujet & \SeuilHorsN & Refus final (seuil ou consigne) & \siGemini{\GemHorsRefus/\SeuilHorsN{} (\GemHorsRefusPct~\%)}{\nonmesure} \\ \hline
 \end{longtable}
+
+\textbf{Lecture des résultats.} La recherche dense remplit son rôle : aucune question du cours n'est refusée à tort, et le passage attendu est transmis au modèle pour \SeuilCoursRappelPct~\% des questions directes et \SeuilRefoRappelPct~\% des questions reformulées. Les échecs relevés tiennent en partie au critère automatique. Pour « Quel modèle génératif principal est utilisé par AKORI ? », les quatre passages retenus ne contiennent pas le nom exact du modèle, alors que celui-ci apparaît sur huit pages du cours : quand un sujet revient dans tout le document, de nombreux passages se ressemblent et le plus précis n'est pas toujours classé parmi les quatre premiers. La recherche hybride et le réordonnancement présentés au chapitre~\ref{chap:perspectives} visent ce cas. Les cellules de la partie « Réponse rédigée par Gemini » se remplissent comme celles du tableau~\ref{tab:latences}.
+
+\textbf{Calibration du seuil.} Le tableau~\ref{tab:balayage} montre l'effet de seuils plus élevés sur les mêmes questions. Sur ce cours, les similarités des questions du cours (\SeuilRefoMin{} au minimum) et des questions hors sujet (\SeuilHorsMax{} au maximum) ne se chevauchent pas : un seuil voisin de 0,45 arrêterait presque toutes les questions hors sujet sans refuser de question du cours. La valeur de 0,30 a été conservée par prudence, car les similarités dépendent du cours (longueur, vocabulaire, langue) et un seuil trop élevé priverait l'étudiant de réponses légitimes. Un réglage du seuil propre à chaque cours fait partie des perspectives. Dans tous les cas, les questions proches du sujet dont la réponse est absente restent hors de portée d'un seuil.
+
+\begin{table}[H]
+\centering
+\caption{Effet du seuil de similarité sur les questions du banc de test}\label{tab:balayage}
+\input{resultats_balayage.tex}
+\end{table}
+
+\textbf{Génération des outils de révision.} Les flashcards, le quiz et la mindmap sont produits à partir d'un échantillon de passages du cours et d'une consigne interdisant les notions extérieures ; leur format JSON est vérifié avant affichage. Ces productions n'ont pas fait l'objet d'une évaluation chiffrée.
 
 \section{Limites identifiées et compromis}
 
@@ -1073,13 +1123,15 @@ Portant sur plusieurs cours & \aremplir{n} & Sources de plusieurs documents & \a
 
 \textbf{Recherche uniquement dense.} Les acronymes rares, les identifiants techniques et les notations formelles peuvent être moins bien retrouvés qu'avec une recherche lexicale.
 
-\textbf{Coût de l'indexation sans GPU.} BGE-M3 est plus lent qu'un petit modèle sur processeur ; l'indexation d'un long document peut prendre plusieurs minutes.
+\textbf{Portée du seuil.} Le seuil de 0,30 n'arrête que les questions très éloignées du cours (\SeuilHorsRefus{} questions hors sujet sur \SeuilHorsN{} dans le banc de test). Pour les autres, et surtout pour les questions proches du sujet dont la réponse est absente, la fiabilité repose sur la consigne donnée au modèle.
+
+\textbf{Coût de l'indexation sans GPU.} BGE-M3 est plus lent qu'un petit modèle sur processeur : environ \IdxParPage~s par page mesurées sans GPU, soit près de deux minutes pour un cours de \IdxPages{} pages, et plus encore pour un document scanné.
 
 \textbf{Hébergement.} Sur un hébergement gratuit sans disque persistant, les données sont perdues au redémarrage ; un stockage persistant est nécessaire en production.
 
 \textbf{Vérification des comptes.} L'existence du domaine de l'adresse est vérifiée, mais pas la possession de l'adresse par l'utilisateur.
 
-\textbf{Portée de l'évaluation.} L'évaluation repose sur un nombre limité de cours et de questions ; elle devra être élargie pour généraliser les résultats.
+\textbf{Portée de l'évaluation.} L'évaluation repose sur un seul cours de test et \RechN{} questions, avec un critère automatique fondé sur des mots attendus ; la recherche sur plusieurs cours d'un même module et la qualité des outils de révision n'ont pas été mesurées. Elle devra être élargie à d'autres cours, à d'autres disciplines et à des étudiants pour généraliser les résultats.
 
 % =========================================================================
 % CHAPITRE 6
@@ -1093,8 +1145,8 @@ Le projet AKORI (\emph{Assistant Knowledge Organized to Revise Intelligently}) a
 Les principaux apports de ce travail sont les suivants :
 \begin{itemize}
   \item \textbf{Une architecture RAG simple et mesurée.} Extraction (avec OCR), découpage par page, BGE-M3, FAISS et un appel unique à Gemini, avec des sources affichées et un mécanisme de secours.
-  \item \textbf{Un contrôle de pertinence par seuil.} Lorsque le meilleur passage est trop éloigné de la question, AKORI n'appelle pas le modèle et indique que l'information ne figure pas dans le cours, ce qui répond directement à la problématique.
-  \item \textbf{Des performances adaptées à l'usage interactif.} Le passage à l'API Gemini et à un appel unique a réduit le temps de réponse de 10--20 secondes à \aremplir{x} secondes en médiane.
+  \item \textbf{Un contrôle de pertinence à deux niveaux.} Lorsque le meilleur passage est trop éloigné de la question, AKORI n'appelle pas le modèle et indique que l'information ne figure pas dans le cours ; pour les questions voisines, la consigne impose de répondre uniquement à partir des passages. Les mesures montrent qu'aucune question du cours n'est refusée à tort, et que le passage attendu est retrouvé pour \SeuilCoursRappelPct~\% des questions directes.
+  \item \textbf{Des performances adaptées à l'usage interactif.} \siGemini{Le passage à l'API Gemini et à un appel unique a réduit le temps de réponse de 10--20 secondes à \GemTotal~secondes en médiane.}{Le passage à l'API Gemini et à un appel unique supprime les étapes intermédiaires du prototype (7 à 12 secondes), et la recherche prend environ \RechMed~ms même sans GPU.}
   \item \textbf{Des fonctionnalités de révision active.} Résumé, flashcards, quiz, colle orale, mindmap et plan de révision fondé sur la répétition espacée transforment la lecture passive en entraînement.
   \item \textbf{Un suivi personnalisé.} L'historique cartographie les lacunes et adapte le niveau des explications.
   \item \textbf{Une application utilisable.} Comptes isolés et sécurisés, plusieurs cours organisés en modules, accès sur ordinateur et sur téléphone, déploiement sur Colab ou sur serveur.
@@ -1107,7 +1159,7 @@ Ce projet a été l'occasion de passer d'une logique d'assemblage de code à une
 % =========================================================================
 % CHAPITRE 7
 % =========================================================================
-\chapter{Perspectives d'évolution}
+\chapter{Perspectives d'évolution}\label{chap:perspectives}
 
 La version actuelle d'AKORI répond aux objectifs fixés : exploitation des supports PDF (y compris scannés), recherche sémantique avec contrôle de pertinence, génération de contenus pédagogiques, organisation en modules et suivi personnalisé. Plusieurs évolutions peuvent néanmoins être envisagées pour améliorer sa fiabilité, ses performances et son accompagnement. La figure~\ref{fig:feuille-route} en présente la feuille de route.
 
@@ -1202,6 +1254,8 @@ Ces améliorations renforceraient la première étape de la chaîne, sur laquell
 
 AKORI utilise une recherche dense (BGE-M3 et FAISS). Les supports techniques contiennent toutefois des éléments pour lesquels la correspondance exacte est importante : acronymes, noms de fonctions, identifiants, notations. Une évolution consisterait à compléter la recherche dense par une recherche lexicale BM25 \cite{robertson2009bm25}, puis à fusionner les deux classements par \emph{Reciprocal Rank Fusion} \cite{cormack2009rrf}, qui évite de comparer directement des scores de nature différente. Un modèle de réordonnancement (\emph{cross-encoder}) pourrait enfin affiner la sélection des passages.
 
+Le seuil de pertinence pourrait aussi être réglé pour chaque cours. Le banc de test montre que, sur le cours étudié, un seuil voisin de 0,45 écarterait presque toutes les questions hors sujet sans refuser de question légitime (tableau~\ref{tab:balayage}). Une calibration automatique, à partir de questions générées sur le cours et de questions générales, adapterait ce seuil à chaque document au lieu d'une valeur unique.
+
 \begin{longtable}{p{0.24\textwidth}|p{0.22\textwidth}|p{0.22\textwidth}|p{0.22\textwidth}}
 \caption{Comparaison qualitative des approches de recherche}\label{tab:hybride}\\
 \hline
@@ -1266,5 +1320,189 @@ Les perspectives d'AKORI ne consistent donc pas uniquement à ajouter de nouvell
 \addcontentsline{toc}{chapter}{Bibliographie}
 \bibliographystyle{unsrtnat}
 \bibliography{references}
+
+% =========================================================================
+% WEBOGRAPHIE
+% =========================================================================
+\chapter*{Webographie}
+\addcontentsline{toc}{chapter}{Webographie}
+
+Documentations et ressources en ligne utilisées pour la réalisation d'AKORI, citées dans le texte sous la forme [W$n$]. Toutes les pages ont été consultées en novembre 2026.
+
+\begin{enumerate}[label={[W\arabic*]},ref={W\arabic*},leftmargin=3.2em,itemsep=0.35em]
+  \item\label{web:depot} \textbf{Dépôt du projet AKORI} (code source, README, captures d'écran, banc de test). \url{https://github.com/mon-espace-claude/AKORI}
+  \item\label{web:genaisdk} Google. \textit{Google Gen AI SDK for Python} (\texttt{google-genai}). \url{https://googleapis.github.io/python-genai/}
+  \item\label{web:geminidoc} Google. \textit{Gemini API documentation} (modèles, quotas, génération en flux). \url{https://ai.google.dev/gemini-api/docs}
+  \item\label{web:aistudio} Google. \textit{Google AI Studio} (création d'une clé d'API Gemini). \url{https://aistudio.google.com/apikey}
+  \item\label{web:bgem3} BAAI. \textit{BAAI/bge-m3}, fiche du modèle sur Hugging Face. \url{https://huggingface.co/BAAI/bge-m3}
+  \item\label{web:sbert} \textit{Sentence-Transformers documentation}. \url{https://www.sbert.net/}
+  \item\label{web:faiss} Meta AI Research. \textit{FAISS : A library for efficient similarity search}, dépôt et wiki. \url{https://github.com/facebookresearch/faiss}
+  \item\label{web:langchain} LangChain. \textit{LangChain Python documentation} (chargeurs, découpage, magasins vectoriels). \url{https://python.langchain.com/docs/}
+  \item\label{web:pymupdf} Artifex. \textit{PyMuPDF documentation}. \url{https://pymupdf.readthedocs.io/}
+  \item\label{web:tesseract} \textit{Tesseract OCR documentation}. \url{https://tesseract-ocr.github.io/}
+  \item\label{web:gradio} Gradio. \textit{Gradio documentation}. \url{https://www.gradio.app/docs}
+  \item\label{web:webspeech} Mozilla. \textit{Web Speech API}, MDN Web Docs. \url{https://developer.mozilla.org/fr/docs/Web/API/Web_Speech_API}
+  \item\label{web:hashlib} Python Software Foundation. \textit{hashlib : PBKDF2}, documentation de Python 3. \url{https://docs.python.org/3/library/hashlib.html}
+  \item\label{web:colab} Google. \textit{Google Colaboratory}. \url{https://colab.research.google.com/}
+  \item\label{web:hfspaces} Hugging Face. \textit{Docker Spaces}, documentation du Hub. \url{https://huggingface.co/docs/hub/spaces-sdks-docker}
+  \item\label{web:docker} Docker. \textit{Docker documentation}. \url{https://docs.docker.com/}
+\end{enumerate}
+
+% =========================================================================
+% ANNEXES
+% =========================================================================
+\appendix
+\addtocontents{toc}{\protect\addvspace{0.8em}}
+
+\chapter{Dépôt du projet et documentation}\label{annexe:depot}
+
+Le code source complet d'AKORI, sa documentation et les outils de mesure utilisés dans ce rapport sont publiés dans un dépôt GitHub \webref{depot} :
+
+\begin{center}
+\begin{minipage}[c]{3.4cm}
+  \centering\qrcode[height=3.2cm]{https://github.com/mon-espace-claude/AKORI}
+\end{minipage}\hspace{1.2cm}%
+\begin{minipage}[c]{8.5cm}
+  \textbf{Dépôt GitHub d'AKORI}\par\smallskip
+  \href{https://github.com/mon-espace-claude/AKORI}{\texttt{github.com/mon-espace-claude/AKORI}}\par\smallskip
+  {\small Le code QR ouvre le dépôt depuis un téléphone.}
+\end{minipage}
+\end{center}
+
+\section{Contenu du dépôt}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.60\textwidth}@{}}
+\toprule
+\textbf{Fichier ou dossier} & \textbf{Contenu} \\ \midrule \endhead
+\texttt{README.md} & Présentation du projet, fonctionnalités, captures d'écran, architecture RAG, installation, configuration et structure du dépôt (figure~\ref{fig:readme}). \\
+\texttt{akori.py} & Application complète : pipeline RAG, interface Gradio, comptes, fonctions de révision, plan de révision, console d'administration. \\
+\texttt{requirements.txt} & Dépendances Python. \\
+\texttt{Dockerfile} & Image pour un serveur ou pour Hugging Face Spaces. \\
+\texttt{rapport/main.tex}, \texttt{references.bib} & Source LaTeX de ce rapport et bibliographie. \\
+\texttt{rapport/benchmark\_akori.py} & Banc de test : indexation, OCR, recherche, seuil, réponses de Gemini (annexe~\ref{annexe:tests}). \\
+\texttt{rapport/resultats\_*.json / .tex} & Résultats mesurés et tableaux générés, lus par ce rapport à la compilation. \\
+\texttt{rapport/mesures\_latence.py} & Calcul des latences à partir du journal d'activité de l'application. \\
+\texttt{rapport/images/annexe/} & Captures d'écran de l'interface (annexe~\ref{annexe:captures}). \\
+\bottomrule
+\end{longtable}
+
+\section{Lancer AKORI}
+
+Une clé d'API Gemini, gratuite sur Google AI Studio \webref{aistudio}, est nécessaire pour la rédaction des réponses.
+
+\begin{itemize}
+  \item \textbf{Google Colab} : placer la clé dans les secrets de Colab (\texttt{GEMINI\_API\_KEY}) et exécuter \texttt{akori.py}. Un lien public s'affiche et les données sont enregistrées sur Google Drive.
+  \item \textbf{Ordinateur ou serveur} : installer les dépendances avec \texttt{pip}, à partir du fichier \texttt{requirements.txt}, lancer \texttt{python akori.py} avec la variable \texttt{GEMINI\_API\_KEY}, puis ouvrir \url{http://localhost:7860}.
+  \item \textbf{Docker} : \texttt{docker build -t akori .}, puis \texttt{docker run -p 7860:7860 -v akori:/data -e GEMINI\_API\_KEY=\dots{} akori}.
+  \item \textbf{Hugging Face Spaces} : créer un Space de type Docker à partir du dépôt et déclarer \texttt{GEMINI\_API\_KEY} et \texttt{AKORI\_ADMIN\_PASSWORD} comme secrets \webref{hfspaces}.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.78\textwidth]{images/annexe/09_readme_depot.jpg}
+  \caption{Début du README du dépôt : présentation, capture de l'interface et fonctionnalités}
+  \label{fig:readme}
+\end{figure}
+
+\chapter{Captures d'écran de l'interface}\label{annexe:captures}
+
+Les captures suivantes ont été réalisées sur la version finale d'AKORI, avec un compte et des cours de démonstration.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/00_presentation.jpg}
+  \caption{Page de présentation affichée avant la connexion}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/01_accueil.jpg}
+  \caption{Accueil (thème sombre) : indicateurs du cours actif et accès aux fonctions}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/02_assistant.jpg}
+  \caption{Assistant IA : réponse rédigée à partir du cours, avec ses sources}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/03_quiz_resultat.jpg}
+  \caption{Quiz (QCM) corrigé à partir du cours}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/04_mindmap.jpg}
+  \caption{Mindmap du cours, avec zoom et déplacement}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/05_progression.jpg}
+  \caption{Progression par cours (flashcards, quiz, colle orale)}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/06_plan_assistant.jpg}
+  \caption{Plan de révision : assistant en cinq étapes}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/annexe/07_plan_emploi_du_temps.jpg}
+  \caption{Plan de révision : emploi du temps généré, cliquable pour le détail de chaque séance}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[height=0.62\textheight,keepaspectratio]{images/annexe/08_telephone_assistant.jpg}
+  \caption{Version téléphone : assistant IA}
+\end{figure}
+
+\chapter{Protocole et résultats détaillés des tests}\label{annexe:tests}
+
+\section{Environnement et cours de test}
+
+\begin{itemize}[nosep]
+  \item \textbf{Date des mesures} : \BenchDate.
+  \item \textbf{Machine} : conteneur Linux, \BenchCPU{} processeurs virtuels, \BenchMateriel.
+  \item \textbf{Réglages d'AKORI} : réglages par défaut (BGE-M3, fragments de 800 caractères avec 80 de chevauchement, $k = 4$, seuil 0,30, OCR Tesseract).
+  \item \textbf{Cours de test} : ce rapport au format PDF (\IdxPages{} pages, \IdxFragments{} fragments). Les \OcrPages{} premières pages ont aussi été converties en images sans texte pour mesurer l'OCR.
+\end{itemize}
+
+\section{Séries de questions et critères}
+
+\begin{itemize}
+  \item \textbf{Dans le cours} (\SeuilCoursN{} questions) et \textbf{reformulées} (\SeuilRefoN{} questions, mêmes notions avec d'autres mots) : chaque question est associée à un ou plusieurs éléments de réponse attendus (par exemple « 800 », « PBKDF2 »). Un passage est jugé pertinent s'il contient l'un d'eux.
+  \item \textbf{Proches du sujet, réponse absente} (\SeuilAbsN{} questions) : questions sur AKORI dont la réponse ne figure nulle part dans le cours ; l'absence a été vérifiée dans le texte du PDF.
+  \item \textbf{Hors sujet} (\SeuilHorsN{} questions) : culture générale, sciences, cuisine, sport, etc.
+\end{itemize}
+
+Pour chaque question, le banc relève la similarité cosinus du meilleur passage (« Sim. max »), la présence d'un passage pertinent parmi les quatre retenus (« Passage »), la décision du seuil et, si l'API Gemini est accessible, la réponse finale : « juste » lorsque l'élément attendu y figure, « refus » lorsque AKORI indique que l'information ne figure pas dans le cours.
+
+\clearpage
+\section{Résultats question par question}
+
+{\small
+\input{resultats_questions.tex}
+}
+
+\section{Reproduire les mesures}
+
+Toutes les valeurs chiffrées du chapitre~\ref{chap:resultats} et de cette annexe proviennent des fichiers générés par le banc de test ; elles se mettent à jour à chaque compilation.
+
+\begin{itemize}
+  \item Mesure complète (indexation, OCR, recherche, seuil et réponses) : \\
+  \texttt{python rapport/benchmark\_akori.py rapport.pdf -{}-gemini -{}-ocr-pages 10}
+  \item Réponses de Gemini seulement, en gardant les autres mesures : \\
+  \texttt{python rapport/benchmark\_akori.py rapport.pdf -{}-seulement gemini}
+  \item Régénérer les tableaux LaTeX à partir des résultats : \\
+  \texttt{python rapport/benchmark\_akori.py -{}-tex}
+\end{itemize}
+
+Le banc écrit \texttt{rapport/resultats\_benchmark.json} (toutes les mesures, y compris le texte des réponses) ainsi que \texttt{resultats\_benchmark.tex}, \texttt{resultats\_questions.tex} et \texttt{resultats\_balayage.tex}, lus par ce rapport.
 
 \end{document}

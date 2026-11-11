@@ -1,0 +1,836 @@
+{
+ "environnement": {
+  "date": "2026-11-11",
+  "cpu": 4,
+  "gpu": "cpu",
+  "modele_embedding": "BAAI/bge-m3",
+  "seuil": 0.3,
+  "k": 4,
+  "chargement_s": 14.2
+ },
+ "indexation": {
+  "pages": 62,
+  "fragments": 185,
+  "duree_s": 116.9,
+  "message": "✅ 'Rapport_AKORI.pdf' indexé avec succès (185 fragments).",
+  "ocr": {
+   "pages": 10,
+   "sans_ocr_s": 28.4,
+   "avec_ocr_s": 45.3,
+   "moteur": "Tesseract (local)",
+   "message": "✅ 'scan_Rapport_AKORI.pdf' indexé avec succès (24 fragments, OCR sur 10 pages)."
+  }
+ },
+ "recherche": {
+  "n": 55,
+  "mediane_ms": 145.8,
+  "p95_ms": 187.4
+ },
+ "seuil": {
+  "cours": {
+   "n": 19,
+   "sim_min": 0.538,
+   "sim_max": 0.705,
+   "sim_mediane": 0.591,
+   "refuses": 0,
+   "pertinent_dans_k": 18
+  },
+  "reformulee": {
+   "n": 10,
+   "sim_min": 0.491,
+   "sim_max": 0.638,
+   "sim_mediane": 0.561,
+   "refuses": 0,
+   "pertinent_dans_k": 7
+  },
+  "absente": {
+   "n": 6,
+   "sim_min": 0.529,
+   "sim_max": 0.639,
+   "sim_mediane": 0.605,
+   "refuses": 0,
+   "pertinent_dans_k": null
+  },
+  "hors_sujet": {
+   "n": 20,
+   "sim_min": 0.278,
+   "sim_max": 0.461,
+   "sim_mediane": 0.409,
+   "refuses": 3,
+   "pertinent_dans_k": null
+  }
+ },
+ "gemini": {},
+ "questions": [
+  {
+   "serie": "cours",
+   "question": "Quel modèle d'embedding utilise AKORI ?",
+   "sim_max": 0.677,
+   "ms": 126.8,
+   "passage_pertinent": true,
+   "pages": [
+    41,
+    30,
+    36,
+    35
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quelle bibliothèque assure la recherche vectorielle des passages ?",
+   "sim_max": 0.569,
+   "ms": 120.5,
+   "passage_pertinent": true,
+   "pages": [
+    34,
+    31,
+    23,
+    17
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quelle est la taille des fragments lors du découpage du texte ?",
+   "sim_max": 0.705,
+   "ms": 173.1,
+   "passage_pertinent": true,
+   "pages": [
+    43,
+    43,
+    42,
+    42
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quel chevauchement est conservé entre deux fragments successifs ?",
+   "sim_max": 0.651,
+   "ms": 156.2,
+   "passage_pertinent": true,
+   "pages": [
+    43,
+    43,
+    55,
+    43
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Combien de passages sont transmis au modèle génératif pour une question ?",
+   "sim_max": 0.628,
+   "ms": 160.3,
+   "passage_pertinent": true,
+   "pages": [
+    16,
+    17,
+    26,
+    29
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quel est le seuil de pertinence utilisé par défaut ?",
+   "sim_max": 0.571,
+   "ms": 123.9,
+   "passage_pertinent": true,
+   "pages": [
+    26,
+    26,
+    17,
+    28
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quel modèle génératif principal est utilisé par AKORI ?",
+   "sim_max": 0.632,
+   "ms": 131.0,
+   "passage_pertinent": false,
+   "pages": [
+    18,
+    16,
+    16,
+    36
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quelle méthode protège les mots de passe des comptes ?",
+   "sim_max": 0.598,
+   "ms": 148.5,
+   "passage_pertinent": true,
+   "pages": [
+    47,
+    59,
+    47,
+    25
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Combien d'itérations utilise la dérivation des mots de passe ?",
+   "sim_max": 0.573,
+   "ms": 186.5,
+   "passage_pertinent": true,
+   "pages": [
+    47,
+    29,
+    26,
+    23
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quelle bibliothèque extrait le texte des fichiers PDF ?",
+   "sim_max": 0.567,
+   "ms": 173.6,
+   "passage_pertinent": true,
+   "pages": [
+    3,
+    55,
+    43,
+    55
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quel moteur OCR lit les pages scannées ?",
+   "sim_max": 0.589,
+   "ms": 181.1,
+   "passage_pertinent": true,
+   "pages": [
+    42,
+    55,
+    10,
+    27
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Avec quel outil l'interface web a-t-elle été construite ?",
+   "sim_max": 0.557,
+   "ms": 170.2,
+   "passage_pertinent": true,
+   "pages": [
+    20,
+    42,
+    21,
+    16
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quel modèle de langage local a été testé au début du projet ?",
+   "sim_max": 0.541,
+   "ms": 137.2,
+   "passage_pertinent": true,
+   "pages": [
+    20,
+    26,
+    36,
+    25
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quelle latence observait le prototype exécuté localement ?",
+   "sim_max": 0.612,
+   "ms": 139.1,
+   "passage_pertinent": true,
+   "pages": [
+    26,
+    49,
+    25,
+    36
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quels sont les intervalles de la répétition espacée du plan de révision ?",
+   "sim_max": 0.636,
+   "ms": 157.1,
+   "passage_pertinent": true,
+   "pages": [
+    45,
+    45,
+    49,
+    58
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Quelle est la dimension des vecteurs produits par BGE-M3 ?",
+   "sim_max": 0.657,
+   "ms": 164.7,
+   "passage_pertinent": true,
+   "pages": [
+    41,
+    36,
+    54,
+    43
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Que signifie le sigle RAG ?",
+   "sim_max": 0.538,
+   "ms": 100.8,
+   "passage_pertinent": true,
+   "pages": [
+    16,
+    13,
+    28,
+    6
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Sur combien de points la colle orale est-elle notée ?",
+   "sim_max": 0.591,
+   "ms": 171.0,
+   "passage_pertinent": true,
+   "pages": [
+    45,
+    47,
+    46,
+    20
+   ],
+   "refus": false
+  },
+  {
+   "serie": "cours",
+   "question": "Où sont enregistrées les données lorsque l'application tourne sur Colab ?",
+   "sim_max": 0.588,
+   "ms": 164.6,
+   "passage_pertinent": true,
+   "pages": [
+    20,
+    52,
+    23,
+    48
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Quel outil compare les vecteurs pour retrouver les extraits les plus proches ?",
+   "sim_max": 0.58,
+   "ms": 185.3,
+   "passage_pertinent": true,
+   "pages": [
+    34,
+    31,
+    35,
+    31
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Avec quel modèle les textes sont-ils transformés en listes de nombres ?",
+   "sim_max": 0.568,
+   "ms": 230.3,
+   "passage_pertinent": true,
+   "pages": [
+    30,
+    30,
+    29,
+    16
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Comment l'application lit-elle les pages qui ne sont que des images ?",
+   "sim_max": 0.638,
+   "ms": 140.0,
+   "passage_pertinent": true,
+   "pages": [
+    16,
+    20,
+    42,
+    55
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Que fait l'assistant quand aucun extrait n'est assez proche de la demande ?",
+   "sim_max": 0.553,
+   "ms": 145.8,
+   "passage_pertinent": false,
+   "pages": [
+    15,
+    13,
+    14,
+    14
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Pourquoi a-t-on renoncé à faire tourner le modèle de langage sur la machine ?",
+   "sim_max": 0.491,
+   "ms": 170.8,
+   "passage_pertinent": true,
+   "pages": [
+    36,
+    23,
+    20,
+    41
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Comment les secrets de connexion des utilisateurs sont-ils conservés de façon sûre ?",
+   "sim_max": 0.583,
+   "ms": 163.8,
+   "passage_pertinent": true,
+   "pages": [
+    47,
+    59,
+    47,
+    21
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Quelle est la longueur de chaque morceau de texte indexé ?",
+   "sim_max": 0.591,
+   "ms": 123.0,
+   "passage_pertinent": true,
+   "pages": [
+    43,
+    43,
+    43,
+    41
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Sur quel principe de psychologie reposent les cartes mémoire et les questionnaires ?",
+   "sim_max": 0.505,
+   "ms": 148.4,
+   "passage_pertinent": false,
+   "pages": [
+    3,
+    32,
+    46,
+    23
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Comment l'application continue-t-elle de répondre quand le service d'IA est saturé ?",
+   "sim_max": 0.543,
+   "ms": 189.3,
+   "passage_pertinent": false,
+   "pages": [
+    13,
+    15,
+    29,
+    21
+   ],
+   "refus": false
+  },
+  {
+   "serie": "reformulee",
+   "question": "Où peut-on héberger l'application pour qu'elle ait une adresse permanente ?",
+   "sim_max": 0.555,
+   "ms": 205.5,
+   "passage_pertinent": true,
+   "pages": [
+    48,
+    24,
+    25,
+    20
+   ],
+   "refus": false
+  },
+  {
+   "serie": "absente",
+   "question": "Quelle est la taille maximale d'un PDF importé ?",
+   "sim_max": 0.62,
+   "ms": 129.4,
+   "passage_pertinent": null,
+   "pages": [
+    43,
+    17,
+    51,
+    35
+   ],
+   "refus": false
+  },
+  {
+   "serie": "absente",
+   "question": "Combien coûte un abonnement mensuel à AKORI ?",
+   "sim_max": 0.592,
+   "ms": 144.5,
+   "passage_pertinent": null,
+   "pages": [
+    59,
+    18,
+    36,
+    59
+   ],
+   "refus": false
+  },
+  {
+   "serie": "absente",
+   "question": "Quelle version de Python est utilisée dans l'image Docker ?",
+   "sim_max": 0.551,
+   "ms": 155.2,
+   "passage_pertinent": null,
+   "pages": [
+    21,
+    22,
+    20,
+    28
+   ],
+   "refus": false
+  },
+  {
+   "serie": "absente",
+   "question": "Sur quel port réseau l'application écoute-t-elle sur le serveur ?",
+   "sim_max": 0.529,
+   "ms": 181.3,
+   "passage_pertinent": null,
+   "pages": [
+    27,
+    22,
+    25,
+    42
+   ],
+   "refus": false
+  },
+  {
+   "serie": "absente",
+   "question": "Combien d'étudiants ont testé AKORI pendant le semestre ?",
+   "sim_max": 0.618,
+   "ms": 180.2,
+   "passage_pertinent": null,
+   "pages": [
+    60,
+    52,
+    59,
+    18
+   ],
+   "refus": false
+  },
+  {
+   "serie": "absente",
+   "question": "AKORI fonctionne-t-il sur un Raspberry Pi ?",
+   "sim_max": 0.639,
+   "ms": 134.2,
+   "passage_pertinent": null,
+   "pages": [
+    18,
+    60,
+    52,
+    36
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quelle est la capitale de l'Australie ?",
+   "sim_max": 0.296,
+   "ms": 158.6,
+   "passage_pertinent": null,
+   "pages": [
+    29,
+    21,
+    21,
+    61
+   ],
+   "refus": true
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment fonctionne la photosynthèse chez les plantes ?",
+   "sim_max": 0.434,
+   "ms": 140.7,
+   "passage_pertinent": null,
+   "pages": [
+    39,
+    29,
+    13,
+    57
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Qui a peint le tableau de la Joconde ?",
+   "sim_max": 0.278,
+   "ms": 144.3,
+   "passage_pertinent": null,
+   "pages": [
+    24,
+    7,
+    46,
+    32
+   ],
+   "refus": true
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quelle est la formule de l'aire d'un cercle ?",
+   "sim_max": 0.385,
+   "ms": 182.2,
+   "passage_pertinent": null,
+   "pages": [
+    41,
+    18,
+    56,
+    50
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Expliquez la théorie de la relativité restreinte d'Einstein.",
+   "sim_max": 0.444,
+   "ms": 185.4,
+   "passage_pertinent": null,
+   "pages": [
+    32,
+    5,
+    33,
+    6
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment préparer une pâte à crêpes ?",
+   "sim_max": 0.41,
+   "ms": 126.9,
+   "passage_pertinent": null,
+   "pages": [
+    32,
+    45,
+    33,
+    16
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quelles sont les causes de la Première Guerre mondiale ?",
+   "sim_max": 0.365,
+   "ms": 131.7,
+   "passage_pertinent": null,
+   "pages": [
+    5,
+    12,
+    15,
+    12
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quel est le rôle des mitochondries dans la cellule ?",
+   "sim_max": 0.41,
+   "ms": 130.9,
+   "passage_pertinent": null,
+   "pages": [
+    29,
+    43,
+    32,
+    39
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment calculer la dérivée d'une fonction polynomiale ?",
+   "sim_max": 0.413,
+   "ms": 179.7,
+   "passage_pertinent": null,
+   "pages": [
+    41,
+    24,
+    29,
+    51
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Qu'est-ce que le protocole de routage OSPF ?",
+   "sim_max": 0.438,
+   "ms": 148.8,
+   "passage_pertinent": null,
+   "pages": [
+    10,
+    21,
+    17,
+    27
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quel est le plus long fleuve d'Afrique ?",
+   "sim_max": 0.326,
+   "ms": 121.0,
+   "passage_pertinent": null,
+   "pages": [
+    36,
+    61,
+    39,
+    41
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment fonctionne un moteur à explosion ?",
+   "sim_max": 0.445,
+   "ms": 105.4,
+   "passage_pertinent": null,
+   "pages": [
+    6,
+    32,
+    29,
+    42
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quelles sont les règles du hors-jeu au football ?",
+   "sim_max": 0.374,
+   "ms": 123.7,
+   "passage_pertinent": null,
+   "pages": [
+    50,
+    20,
+    23,
+    17
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Qu'est-ce que l'inflation en économie ?",
+   "sim_max": 0.416,
+   "ms": 143.8,
+   "passage_pertinent": null,
+   "pages": [
+    24,
+    12,
+    41,
+    13
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment soigner une grippe saisonnière ?",
+   "sim_max": 0.353,
+   "ms": 112.2,
+   "passage_pertinent": null,
+   "pages": [
+    58,
+    32,
+    20,
+    17
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quelle est la vitesse de la lumière dans le vide ?",
+   "sim_max": 0.408,
+   "ms": 116.2,
+   "passage_pertinent": null,
+   "pages": [
+    24,
+    31,
+    50,
+    34
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Qui a écrit le roman Les Misérables ?",
+   "sim_max": 0.297,
+   "ms": 101.8,
+   "passage_pertinent": null,
+   "pages": [
+    32,
+    29,
+    61,
+    61
+   ],
+   "refus": true
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment fonctionne la blockchain du Bitcoin ?",
+   "sim_max": 0.461,
+   "ms": 89.4,
+   "passage_pertinent": null,
+   "pages": [
+    47,
+    41,
+    39,
+    29
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Quelles sont les étapes de la mitose ?",
+   "sim_max": 0.419,
+   "ms": 111.7,
+   "passage_pertinent": null,
+   "pages": [
+    43,
+    47,
+    6,
+    16
+   ],
+   "refus": false
+  },
+  {
+   "serie": "hors_sujet",
+   "question": "Comment se forme un arc-en-ciel ?",
+   "sim_max": 0.406,
+   "ms": 95.1,
+   "passage_pertinent": null,
+   "pages": [
+    29,
+    13,
+    39,
+    14
+   ],
+   "refus": false
+  }
+ ]
+}
